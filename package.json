@@ -1,0 +1,36 @@
+{
+  "name": "meal-planner",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@10.20.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @mp/server --filter @mp/web dev",
+    "build": "pnpm --filter @mp/web build",
+    "start": "node scripts/start.mjs",
+    "mcp": "pnpm --filter @mp/mcp start",
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test:e2e": "playwright test",
+    "screenshots:compare": "node --import tsx scripts/compare-screenshots.mts",
+    "test:all": "npm run test:unit && npm run test:e2e",
+    "test:unit": "pnpm -r --if-present test"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp"
+    ]
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@types/node": "^24.0.0",
+    "@types/pngjs": "^6.0.5",
+    "pixelmatch": "^8.0.0",
+    "pngjs": "^7.0.0",
+    "sharp": "^0.35.5",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

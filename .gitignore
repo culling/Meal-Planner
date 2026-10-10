@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+# The data folder is its own git repository (auto-committed by the app)
+/data/
+/test-data/
+*.log
+
+/.e2e/
+/test-results/
+/playwright-report/
