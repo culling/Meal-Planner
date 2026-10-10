@@ -78,6 +78,22 @@ function ChipPicker({ title, options, value, onChange }: { title: string; option
   );
 }
 
+/** Main / Side / Both switch for browsing recipes. */
+export function RoleSeg({ value, onChange }: { value: RecipeFilters["role"]; onChange: (r: NonNullable<RecipeFilters["role"]>) => void }) {
+  const cur = value?.length === 2 ? "both" : (value?.[0] ?? "main");
+  return (
+    <Seg
+      value={cur}
+      options={[
+        { value: "main", label: "Mains" },
+        { value: "side", label: "Sides" },
+        { value: "both", label: "All" },
+      ]}
+      onChange={(v) => onChange(v === "both" ? ["main", "side"] : [v as "main" | "side"])}
+    />
+  );
+}
+
 /** All the filters from the spec in one panel. Used by the recipe list and the meal picker. */
 export function FilterPanel({ value, onChange, compact }: { value: RecipeFilters; onChange: (f: RecipeFilters) => void; compact?: boolean }) {
   const { data: facets } = useFacets();

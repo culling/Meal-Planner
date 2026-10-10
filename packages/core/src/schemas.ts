@@ -131,6 +131,15 @@ export const GalleryItemSchema = z
   .passthrough();
 export type GalleryItem = z.infer<typeof GalleryItemSchema>;
 
+export const RecipeRoleSchema = z.enum(["main", "side"]);
+export type RecipeRole = z.infer<typeof RecipeRoleSchema>;
+
+/** Best guess at a recipe's role from its free-text course labels: only mains/dinners (or recipes with no course at all) count as mains. */
+export function inferRole(course: string[] | undefined | null): RecipeRole[] {
+  if (!course?.length || course.some((c) => /main|dinner/i.test(c))) return ["main"];
+  return ["side"];
+}
+
 export const RecipeMetaSchema = z
   .object({
     id: z.string(),
@@ -151,6 +160,8 @@ export const RecipeMetaSchema = z
     tags: z.array(z.string()).default([]),
     cuisine: z.string().nullable().default(null),
     course: z.array(z.string()).default([]),
+    /** main, side, or both — a clean version of `course` used for filtering and meal suggestions */
+    role: z.array(RecipeRoleSchema).min(1).default(["main"]),
     diet: z.array(z.string()).default([]),
     favorite: z.boolean().default(false),
     hidden: z.boolean().default(false),
@@ -167,6 +178,12 @@ export const RecipeMetaSchema = z
   })
   .passthrough();
 export type RecipeMeta = z.infer<typeof RecipeMetaSchema>;
+
+/** Parse recipe frontmatter; recipes saved before `role` existed get it inferred from their course. */
+export function parseRecipeMeta(raw: Record<string, unknown>): RecipeMeta {
+  const role = raw.role == null || (Array.isArray(raw.role) && !raw.role.length) ? inferRole(raw.course as string[] | undefined) : raw.role;
+  return RecipeMetaSchema.parse({ ...raw, role });
+}
 
 /** A parsed ingredient line. Derived from the Markdown, never written back. */
 export interface ParsedIngredient {
@@ -348,6 +365,7 @@ export interface RecipeDraft {
   tags: string[];
   cuisine: string | null;
   course: string[];
+  role?: RecipeRole[];
   diet: string[];
   nutrition: { perServing: Nutrients; source: NutritionSource | null; confidence: Confidence | null } | null;
   leftovers: Leftovers | null;

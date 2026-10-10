@@ -1,7 +1,7 @@
 import { formatIngredient, todayYmd, type GalleryItem } from "@mp/core/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, useRecipe, type RecipeFull } from "../api";
 import { NutritionPanel } from "../components/NutritionPanel";
 import { AddToPlanModal, CookedModal, HistoryModal, LeftoversModal, RawModal, RenameModal, Stars } from "../components/RecipeModals";
@@ -11,21 +11,23 @@ import { CheckBox, ErrorBox, fmtDate, fmtMinutes, Loading, Menu, SourceBadge, St
 export function RecipePage() {
   const { slug } = useParams();
   const { data: r, error, isLoading, refetch } = useRecipe(slug);
+  // the plan links here with ?servings=N so the recipe opens scaled to what's being made
+  const asked = Number(useSearchParams()[0].get("servings"));
   if (isLoading) return <Loading />;
   if (error || !r) return <ErrorBox error={error ?? new Error("Recipe not found")} retry={() => refetch()} />;
-  return <RecipeView key={r.slug} r={r} />;
+  return <RecipeView key={`${r.slug}:${asked}`} r={r} initialServings={asked >= 1 ? Math.min(60, Math.round(asked)) : undefined} />;
 }
 
 type ModalName = null | "plan" | "cooked" | "raw" | "history" | "rename" | "leftovers";
 
-function RecipeView({ r }: { r: RecipeFull }) {
+function RecipeView({ r, initialServings }: { r: RecipeFull; initialServings?: number }) {
   const nav = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
   const confirm = useConfirm();
   const m = r.meta;
   const baseServings = m.servings ?? 4;
-  const [servings, setServings] = useState(baseServings);
+  const [servings, setServings] = useState(initialServings ?? baseServings);
   const [ticked, setTicked] = useState<Set<number>>(new Set());
   const [doneSteps, setDoneSteps] = useState<Set<number>>(new Set());
   const [modal, setModal] = useState<ModalName>(null);

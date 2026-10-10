@@ -303,6 +303,7 @@ export class Importer {
       tags: draft.tags,
       cuisine: draft.cuisine,
       course: draft.course,
+      ...(draft.role?.length ? { role: draft.role } : {}),
       diet: draft.diet,
       source: { ...draft.source, importedAt: draft.source.importedAt ?? now },
       nutrition: draft.nutrition

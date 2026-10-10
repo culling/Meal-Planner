@@ -760,7 +760,7 @@ function MealDialog({
               <div className="card flat row">
                 <RecipeThumb slug={recipe} emoji="🍲" />
                 <div className="grow">
-                  <Link to={`/recipes/${recipe}`} onClick={onClose} style={{ fontWeight: 800 }} title="Open the recipe">
+                  <Link to={`/recipes/${recipe}?servings=${eatingPortions}`} onClick={onClose} style={{ fontWeight: 800 }} title="Open the recipe">
                     {rec?.meta.title ?? recipe}
                   </Link>
                   <div className="small muted">{rec?.meta.servings ? `Makes ${rec.meta.servings}` : ""}</div>
@@ -814,6 +814,11 @@ function MealDialog({
                   </button>
                 );
               })
+            )}
+            {from.key && recipe && (
+              <Link to={`/recipes/${recipe}?servings=${effectivePeople}`} onClick={onClose} className="small" title="Open the recipe">
+                Open {rec?.meta.title ?? recipe} ({effectivePeople} portion{effectivePeople === 1 ? "" : "s"})
+              </Link>
             )}
             {from.key && !options?.some((o) => o.key === from.key && o.store === from.store) && options !== null && (
               <div className="notice warn">
@@ -1055,7 +1060,7 @@ function PrepDialog({
           <div className="card flat row">
             <RecipeThumb slug={recipe} emoji="🥣" />
             <div className="grow">
-              <Link to={`/recipes/${recipe}`} onClick={onClose} style={{ fontWeight: 800 }} title="Open the recipe">
+              <Link to={`/recipes/${recipe}?servings=${made}`} onClick={onClose} style={{ fontWeight: 800 }} title="Open the recipe">
                 {rec?.meta.title ?? recipe}
               </Link>
               <div className="small muted">

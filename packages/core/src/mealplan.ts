@@ -424,7 +424,7 @@ export function suggestPlan(plan: MealPlan, settings: Settings, opts: SuggestOpt
     if (r.meta.nutrition.perServing.calories == null) s -= 0.2;
     return s;
   };
-  const eligible = opts.candidates.filter((r) => !r.meta.hidden && r.ingredients.length > 0 && (!r.meta.course.length || r.meta.course.some((c) => /main|dinner/i.test(c))));
+  const eligible = opts.candidates.filter((r) => !r.meta.hidden && r.ingredients.length > 0 && r.meta.role.includes("main"));
   const pool = eligible.length ? eligible : opts.candidates.filter((r) => !r.meta.hidden);
 
   for (let i = 0; i < next.days.length; i++) {

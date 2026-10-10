@@ -2,6 +2,7 @@ import {
   NUTRIENT_KEYS,
   NUTRIENT_LABELS,
   emptyNutrients,
+  inferRole,
   parseIngredientSection,
   type Confidence,
   type Leftovers,
@@ -24,6 +25,7 @@ export interface FormState {
   cuisine: string;
   tags: string[];
   course: string[];
+  role: ("main" | "side")[];
   diet: string[];
   ingredientsMd: string;
   methodMd: string;
@@ -48,6 +50,7 @@ export function blankForm(): FormState {
     cuisine: "",
     tags: [],
     course: [],
+    role: ["main"],
     diet: [],
     ingredientsMd: "",
     methodMd: "",
@@ -70,6 +73,7 @@ export function formFromRecipe(r: RecipeFull): FormState {
     cuisine: m.cuisine ?? "",
     tags: m.tags,
     course: m.course,
+    role: m.role,
     diet: m.diet,
     ingredientsMd: r.parts.ingredientsMd,
     methodMd: r.parts.methodMd,
@@ -91,6 +95,7 @@ export function formFromDraft(d: RecipeDraft): FormState {
     cuisine: d.cuisine ?? "",
     tags: d.tags,
     course: d.course,
+    role: d.role?.length ? d.role : inferRole(d.course),
     diet: d.diet,
     ingredientsMd: d.ingredientsMd,
     methodMd: d.methodMd,
@@ -112,6 +117,7 @@ export function formToRecipeInput(f: FormState, includeNutrition: boolean) {
     cuisine: f.cuisine.trim() || null,
     tags: f.tags,
     course: f.course,
+    role: f.role,
     diet: f.diet,
     ingredientsMd: f.ingredientsMd,
     methodMd: f.methodMd,
@@ -133,6 +139,7 @@ export function formToDraft(f: FormState, base: RecipeDraft): RecipeDraft {
     cuisine: f.cuisine.trim() || null,
     tags: f.tags,
     course: f.course,
+    role: f.role,
     diet: f.diet,
     ingredientsMd: f.ingredientsMd,
     methodMd: f.methodMd,
@@ -250,6 +257,18 @@ export function RecipeForm({ value, onChange, confidence = {}, mode }: { value: 
         <div className="field">
           <label>Tags</label>
           <TagInput value={value.tags} onChange={(tags) => set({ tags })} suggestions={facets?.tags.map((t) => t.name)} placeholder="curry, weeknight…" />
+        </div>
+        <div className="field">
+          <label>Main or side?</label>
+          <Seg
+            value={value.role.length === 2 ? "both" : value.role[0]}
+            options={[
+              { value: "main", label: "Main" },
+              { value: "side", label: "Side" },
+              { value: "both", label: "Either" },
+            ]}
+            onChange={(v) => set({ role: v === "both" ? ["main", "side"] : [v as "main" | "side"] })}
+          />
         </div>
         <div className="grid2">
           <div className="field">

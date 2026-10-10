@@ -75,6 +75,7 @@ export function summarise(r: Recipe) {
     tags: m.tags,
     cuisine: m.cuisine,
     course: m.course,
+    role: m.role,
     diet: m.diet,
     sourceType: m.source.type,
     updatedAt: m.updatedAt,

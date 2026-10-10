@@ -1,18 +1,18 @@
 import type { RecipeFilters } from "@mp/core/shared";
 import { useState } from "react";
-import { useRecipes, type RecipeSummary } from "../api";
-import { FilterPanel, RecipeCard } from "../components";
+import { DEFAULT_ROLE, useRecipes, type RecipeSummary } from "../api";
+import { FilterPanel, RecipeCard, RoleSeg } from "../components";
 import { Filter, Search } from "../icons";
 import { Empty, Loading, Modal, useDebounced } from "../ui";
 
 /** Choose a recipe, with the same filters as the main list (calories, time, leftovers, tags…). */
 export function RecipePicker({ onPick, onClose, title = "Pick a recipe", initial }: { onPick: (r: RecipeSummary) => void; onClose: () => void; title?: string; initial?: RecipeFilters }) {
-  const [filters, setFilters] = useState<RecipeFilters>(initial ?? {});
+  const [filters, setFilters] = useState<RecipeFilters>({ role: DEFAULT_ROLE, ...initial });
   const [q, setQ] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const dq = useDebounced(q, 250);
   const { data, isLoading } = useRecipes({ ...filters, q: dq.trim() || undefined });
-  const active = Object.entries(filters).filter(([k, v]) => !["sort", "order", "q"].includes(k) && v !== undefined && !(Array.isArray(v) && !v.length)).length;
+  const active = Object.entries(filters).filter(([k, v]) => !["sort", "order", "q", "role"].includes(k) && v !== undefined && !(Array.isArray(v) && !v.length)).length;
   return (
     <Modal title={title} onClose={onClose} wide>
       <div className="stack">
@@ -26,6 +26,7 @@ export function RecipePicker({ onPick, onClose, title = "Pick a recipe", initial
           </button>
         </div>
         <div className="row wrap">
+          <RoleSeg value={filters.role} onChange={(role) => setFilters({ ...filters, role })} />
           <button className={`chip ${filters.favoritesOnly ? "on" : ""}`} style={{ cursor: "pointer" }} onClick={() => setFilters({ ...filters, favoritesOnly: filters.favoritesOnly ? undefined : true })}>
             ♥ Favourites
           </button>

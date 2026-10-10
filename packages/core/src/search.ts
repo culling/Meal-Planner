@@ -15,6 +15,8 @@ export interface RecipeFilters {
   excludeTags?: string[];
   cuisine?: string[];
   course?: string[];
+  /** recipes that can serve as any of these (a recipe that is both matches either) */
+  role?: ("main" | "side")[];
   diet?: string[];
   favoritesOnly?: boolean;
   hidden?: "exclude" | "include" | "only";
@@ -124,6 +126,7 @@ export class RecipeSearch {
     }
     if (f.cuisine?.length) list = list.filter((r) => r.meta.cuisine && f.cuisine!.some((c) => lc(c) === lc(r.meta.cuisine!)));
     if (f.course?.length) list = list.filter((r) => anyAll(r.meta.course, f.course, "any"));
+    if (f.role?.length) list = list.filter((r) => r.meta.role.some((x) => f.role!.includes(x)));
     if (f.diet?.length) list = list.filter((r) => anyAll(r.meta.diet, f.diet, "all"));
     if (f.nutritionSource?.length) {
       list = list.filter((r) => {
@@ -192,6 +195,7 @@ export function filtersFromQuery(q: Record<string, unknown>): RecipeFilters {
     excludeTags: list(q.excludeTags),
     cuisine: list(q.cuisine),
     course: list(q.course),
+    role: list(q.role)?.filter((x): x is "main" | "side" => x === "main" || x === "side"),
     diet: list(q.diet),
     favoritesOnly: bool(q.favoritesOnly),
     hidden: q.hidden === "include" || q.hidden === "only" ? q.hidden : undefined,

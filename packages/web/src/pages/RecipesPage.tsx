@@ -1,14 +1,17 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { activeFilterCount, filtersFromParams, filtersToQuery, useRecipes } from "../api";
-import { FilterPanel, MISSING_LABELS, RecipeCard, SORTS } from "../components";
+import { activeFilterCount, DEFAULT_ROLE, filtersFromParams, filtersToQuery, useRecipes } from "../api";
+import { FilterPanel, MISSING_LABELS, RecipeCard, RoleSeg, SORTS } from "../components";
 import { Filter, Search, X } from "../icons";
 import { Empty, ErrorBox, Loading, Modal, useDebounced } from "../ui";
 import type { RecipeFilters } from "@mp/core/shared";
 
 export function RecipesPage() {
   const [params, setParams] = useSearchParams();
-  const filters = useMemo(() => filtersFromParams(params), [params]);
+  const filters = useMemo(() => {
+    const f = filtersFromParams(params);
+    return { ...f, role: f.role?.length ? f.role : DEFAULT_ROLE };
+  }, [params]);
   const [search, setSearch] = useState(filters.q ?? "");
   const debounced = useDebounced(search, 250);
   const [sheet, setSheet] = useState(false);
@@ -68,6 +71,7 @@ export function RecipesPage() {
       </div>
 
       <div className="row wrap">
+        <RoleSeg value={filters.role} onChange={(role) => update({ ...filters, role })} />
         <button className={`chip ${filters.favoritesOnly ? "on" : ""}`} style={{ cursor: "pointer" }} onClick={() => update({ ...filters, favoritesOnly: filters.favoritesOnly ? undefined : true })}>
           ♥ Favourites
         </button>

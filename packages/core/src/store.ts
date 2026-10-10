@@ -38,6 +38,7 @@ import {
   FoodSchema,
   MealPlanSchema,
   RecipeMetaSchema,
+  parseRecipeMeta,
   SettingsSchema,
   ShoppingListSchema,
   type Food,
@@ -314,7 +315,7 @@ export class DataStore extends EventEmitter {
   }
 
   private buildRecipe(slug: string, doc: ParsedDoc, mtimeMs: number): Recipe {
-    const meta = RecipeMetaSchema.parse({ ...doc.data, id: slug, title: doc.data.title ?? slug });
+    const meta = parseRecipeMeta({ ...doc.data, id: slug, title: doc.data.title ?? slug });
     return this.recipeFrom(slug, meta, doc.body, mtimeMs);
   }
 
@@ -357,7 +358,7 @@ export class DataStore extends EventEmitter {
     const { ingredientsMd, methodMd, sourceNotes, ...metaIn } = input;
     const now = nowIso();
     const meta = validate(() =>
-      RecipeMetaSchema.parse({
+      parseRecipeMeta({
         ...metaIn,
         id: slug,
         title,
@@ -392,12 +393,12 @@ export class DataStore extends EventEmitter {
       if (!r) throw new NotFoundError(`Recipe "${slug}"`);
       if (opts.expectedMtimeMs != null && Math.abs(r.mtimeMs - opts.expectedMtimeMs) > 1) throw new ConflictError(file);
       const doc = parseDoc(r.text);
-      const current = validate(() => RecipeMetaSchema.parse({ ...doc.data, id: slug, title: doc.data.title ?? slug }));
+      const current = validate(() => parseRecipeMeta({ ...doc.data, id: slug, title: doc.data.title ?? slug }));
       const out = fn(structuredClone(current), doc.body) ?? {};
       let meta = out.meta ?? current;
       const body = out.body ?? doc.body;
       if (opts.touch !== false) meta = { ...meta, updatedAt: nowIso() };
-      meta = validate(() => RecipeMetaSchema.parse({ ...meta, id: slug }));
+      meta = validate(() => parseRecipeMeta({ ...meta, id: slug }));
       const text = stringifyDoc(meta as Record<string, unknown>, body, doc);
       const mtime = text === r.text ? r.mtimeMs : await atomicWrite(file, text, r.mtimeMs);
       const recipe = this.recipeFrom(slug, meta, body, mtime);
@@ -435,7 +436,7 @@ export class DataStore extends EventEmitter {
       const file = this.recipeFile(slug);
       if (!(await exists(file))) throw new NotFoundError(`Recipe "${slug}"`);
       const doc = validate(() => parseDoc(text));
-      const meta = validate(() => RecipeMetaSchema.parse({ ...doc.data, id: slug, title: doc.data.title ?? slug }));
+      const meta = validate(() => parseRecipeMeta({ ...doc.data, id: slug, title: doc.data.title ?? slug }));
       const mtime = await atomicWrite(file, text.endsWith("\n") ? text : `${text}\n`, expectedMtimeMs);
       const recipe = this.recipeFrom(slug, meta, doc.body, mtime);
       this.recipes.set(slug, recipe);

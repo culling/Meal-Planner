@@ -75,6 +75,7 @@ export interface RecipeSummary {
   tags: string[];
   cuisine: string | null;
   course: string[];
+  role: ("main" | "side")[];
   diet: string[];
   sourceType: string;
   updatedAt: string | null;
@@ -168,6 +169,7 @@ export function filtersFromParams(p: URLSearchParams): RecipeFilters {
     excludeTags: list("excludeTags"),
     cuisine: list("cuisine"),
     course: list("course"),
+    role: list("role")?.filter((x): x is "main" | "side" => x === "main" || x === "side"),
     diet: list("diet"),
     favoritesOnly: p.get("favoritesOnly") === "true" ? true : undefined,
     hidden: (p.get("hidden") as RecipeFilters["hidden"]) ?? undefined,
@@ -179,10 +181,13 @@ export function filtersFromParams(p: URLSearchParams): RecipeFilters {
   };
 }
 
+/** Browsing shows main dishes unless the person chooses otherwise. */
+export const DEFAULT_ROLE: ("main" | "side")[] = ["main"];
+
 /** Number of filters (not counting search text and sorting) that are switched on. */
 export function activeFilterCount(f: RecipeFilters): number {
-  const { q, sort, order, tagsMode, ...rest } = f;
-  void q; void sort; void order; void tagsMode;
+  const { q, sort, order, tagsMode, role, ...rest } = f;
+  void q; void sort; void order; void tagsMode; void role;
   return Object.values(rest).filter((v) => v !== undefined && v !== null && (v as unknown) !== "" && !(Array.isArray(v) && !v.length)).length;
 }
 

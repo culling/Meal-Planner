@@ -34,6 +34,7 @@ const filterShape = {
   excludeTags: z.array(z.string()).optional(),
   cuisine: z.array(z.string()).optional(),
   course: z.array(z.string()).optional(),
+  role: z.array(z.enum(["main", "side"])).optional().describe("main and/or side dishes"),
   diet: z.array(z.string()).optional(),
   favoritesOnly: z.boolean().optional(),
   hidden: z.enum(["exclude", "include", "only"]).optional(),
@@ -70,6 +71,7 @@ const brief = (r: Recipe) => ({
   rating: r.meta.rating,
   lastCooked: r.lastCooked,
   tags: r.meta.tags,
+  role: r.meta.role,
 });
 
 export function buildTools(app: App): ToolDef[] {
@@ -130,6 +132,7 @@ export function buildTools(app: App): ToolDef[] {
         sourceNotes: z.string().optional(),
         tags: z.array(z.string()).optional(),
         cuisine: z.string().optional(),
+        role: z.array(z.enum(["main", "side"])).optional().describe("main, side, or both (default main)"),
         times: z.object({ prepMinutes: z.number().nullable().optional(), cookMinutes: z.number().nullable().optional(), totalMinutes: z.number().nullable().optional() }).optional(),
         sourceUrl: z.string().optional(),
       },
