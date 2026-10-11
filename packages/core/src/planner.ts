@@ -172,11 +172,20 @@ export class Planner {
     };
   }
 
-  /** Leftovers that can still be eaten on `date`. */
-  async availableLeftovers(date: string) {
+  /** Leftovers that can still be eaten on `date`; pass `slot` when editing that meal so its own portions count as available. */
+  async availableLeftovers(date: string, slot?: string) {
     const week = isoWeekOf(date);
     const view = await this.view(week);
-    return availableLeftovers(view.batches, date).map((a) => ({
+    let own: { key: string; store: "fridge" | "freezer"; portions: number } | null = null;
+    if (slot) {
+      const plan = await this.store.getPlan(week);
+      const day = plan.days.find((d) => d.date === date);
+      const meal = day?.meals[slot];
+      if (meal?.type === "leftovers" && meal.leftoverFrom) {
+        own = { key: meal.leftoverFrom, store: meal.leftoverStore, portions: resolvePeople(meal, day, plan, this.store.getSettings()).value };
+      }
+    }
+    return availableLeftovers(view.batches, date, own).map((a) => ({
       key: a.batch.key,
       recipe: a.batch.recipe,
       title: a.batch.title,

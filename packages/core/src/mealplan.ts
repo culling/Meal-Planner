@@ -211,14 +211,25 @@ export function computeLeftovers(
   return { batches: [...batches.values()], warnings };
 }
 
-/** Batches that can still feed a leftovers meal on `date` (stock left and within the safe date). */
-export function availableLeftovers(batches: LeftoverBatch[], date: string): { batch: LeftoverBatch; store: "fridge" | "freezer"; remaining: number }[] {
+/**
+ * Batches that can still feed a leftovers meal on `date` (stock left and within the safe date).
+ * `own` is the leftovers meal being edited: its portions are already counted as used, so they're given back
+ * (otherwise a batch whose portions are all planned out shows as used up for the very meals eating it).
+ */
+export function availableLeftovers(
+  batches: LeftoverBatch[],
+  date: string,
+  own?: { key: string; store: "fridge" | "freezer"; portions: number } | null,
+): { batch: LeftoverBatch; store: "fridge" | "freezer"; remaining: number }[] {
   const out: { batch: LeftoverBatch; store: "fridge" | "freezer"; remaining: number }[] = [];
+  const back = (b: LeftoverBatch, store: "fridge" | "freezer") => (own && own.key === b.key && own.store === store ? own.portions : 0);
   for (const b of batches) {
     if (b.cookDate > date) continue;
-    if (b.fridgeRemaining > 0 && date <= b.fridgeUntil) out.push({ batch: b, store: "fridge", remaining: b.fridgeRemaining });
+    const fridge = b.fridgeRemaining + back(b, "fridge");
+    if (fridge > 0 && date <= b.fridgeUntil) out.push({ batch: b, store: "fridge", remaining: fridge });
     const frozenOk = b.frozen.length > 0 && b.frozen.every((f) => f.date <= date && date <= f.until);
-    if (b.freezerRemaining > 0 && frozenOk) out.push({ batch: b, store: "freezer", remaining: b.freezerRemaining });
+    const freezer = b.freezerRemaining + back(b, "freezer");
+    if (freezer > 0 && frozenOk) out.push({ batch: b, store: "freezer", remaining: freezer });
   }
   return out;
 }

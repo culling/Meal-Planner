@@ -112,6 +112,17 @@ describe("leftovers", () => {
     expect(availableLeftovers(batches, "2026-10-11")).toHaveLength(0);
   });
 
+  it("still offers a fully planned-out batch to the meal that eats it", () => {
+    const p = plan("2026-W42", {
+      0: { dinner: meal({ recipe: "curry", type: "cook", portions: 4 }) },
+      1: { lunch: meal({ recipe: "curry", type: "leftovers", leftoverFrom: "2026-10-12/dinner" }) },
+    });
+    const { batches } = computeLeftovers([p], lookup, settings);
+    expect(availableLeftovers(batches, "2026-10-13")).toHaveLength(0);
+    const own = { key: "2026-10-12/dinner", store: "fridge" as const, portions: 2 };
+    expect(availableLeftovers(batches, "2026-10-13", own)).toMatchObject([{ store: "fridge", remaining: 2 }]);
+  });
+
   it("moves portions to the freezer with a longer life", () => {
     const p = plan("2026-W42", {
       0: { dinner: meal({ recipe: "curry", type: "cook", portions: 4, frozen: [{ date: "2026-10-13", portions: 2 }] }) },

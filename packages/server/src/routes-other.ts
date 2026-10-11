@@ -132,7 +132,9 @@ export function registerOtherRoutes(server: FastifyInstance, app: App) {
     return { notes: res.notes, saved: res.saved, view: res.saved ? await planner.view(req.params.week) : null, plan: res.plan };
   });
 
-  server.get<{ Querystring: { date?: string } }>("/api/leftovers", async (req) => ({ leftovers: await planner.availableLeftovers(req.query.date ?? todayYmd()) }));
+  server.get<{ Querystring: { date?: string; slot?: string } }>("/api/leftovers", async (req) => ({
+    leftovers: await planner.availableLeftovers(req.query.date ?? todayYmd(), req.query.slot || undefined),
+  }));
 
   // ---------- shopping list ----------
   server.get<{ Params: { week: string } }>("/api/meal-plans/:week/shopping-list", async (req) => store.getShoppingList(week(req.params.week)));

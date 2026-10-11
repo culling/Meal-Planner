@@ -718,8 +718,8 @@ function MealDialog({
 
   useEffect(() => {
     if (type !== "leftovers") return;
-    void api.get<{ leftovers: LeftoverOption[] }>(`/api/leftovers?date=${date}`).then((r) => setOptions(r.leftovers));
-  }, [type, date]);
+    void api.get<{ leftovers: LeftoverOption[] }>(`/api/leftovers?date=${date}&slot=${encodeURIComponent(slot)}`).then((r) => setOptions(r.leftovers));
+  }, [type, date, slot]);
 
   const inherited = existing ? (existing.people.from === "meal" ? { value: day.people.value, from: day.people.from } : existing.people) : day.people;
   const effectivePeople = people ?? inherited.value;
