@@ -80,7 +80,7 @@ About 14,000 lines of TypeScript. The server and MCP run directly with `tsx`, an
 1. Double-click **`start.bat`** (the first run builds the web app), or run `npm run start` after a one-off `pnpm install`.
 2. The window prints two addresses:
    - On the computer: `http://localhost:3456`
-   - On your phone (same Wi-Fi): `http://<this-computer's-IP>:3456`, for example `http://192.168.0.66:3456`
+   - On your phone (same Wi-Fi): `http://<this-computer's-IP>:3456`, for example `http://192.168.1.20:3456`
 3. If the phone can't connect, allow the port through Windows Firewall. Do this once, in an *administrator* PowerShell:
    ```powershell
    New-NetFirewallRule -DisplayName "Meal Planner" -Direction Inbound -Protocol TCP -LocalPort 3456 -Action Allow -Profile Private

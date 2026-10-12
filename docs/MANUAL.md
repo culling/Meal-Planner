@@ -28,7 +28,7 @@ All screenshots below come from the automated browser tests, so they show the ap
 1. On the computer that holds your recipes, double-click **`start.bat`**. The first run takes a minute because it builds the app.
 2. The window shows two addresses:
    - **On this computer:** `http://localhost:3456`
-   - **On your phone** (same Wi-Fi): something like `http://192.168.0.66:3456`
+   - **On your phone** (same Wi-Fi): something like `http://192.168.1.20:3456`
 3. On your phone in Chrome, tap **⋮ → Add to Home screen** and it opens like an app.
 4. For reading recipe photos and working out nutrition, also keep **Ollama** running. Everything else works without it.
 
