@@ -127,7 +127,7 @@ export interface Status {
   dataDir: string;
   recipes: number;
   problems: { slug: string; error: string }[];
-  ollama: { url: string; ok: boolean; error?: string; models: { name: string; sizeGb: number | null; vision: boolean }[] };
+  ollama: { url: string; envUrl: string; ok: boolean; error?: string; models: { name: string; sizeGb: number | null; vision: boolean }[] };
   lightOnOcr: boolean;
   git: { enabled: boolean; history: { hash: string; date: string; message: string }[] };
   today: string;

@@ -112,13 +112,30 @@ export function SettingsPage() {
         {status && !status.ollama.ok && (
           <div className="notice bad">
             <div>
-              {status.ollama.error ?? "Can't reach Ollama."} Start it on your computer and press <b>Check again</b>. The address comes from <code>OLLAMA_URL</code> in the <code>.env</code> file ({status.ollama.url}).
+              {status.ollama.error ?? "Can't reach Ollama."} Check that Ollama is running on that computer (and accepts connections from the network), or fix the address below, then press <b>Check again</b>.
             </div>
           </div>
         )}
         <p className="small muted" style={{ margin: 0 }}>
           Models run on your own computer through Ollama. Nothing is sent to the internet. Bigger models are more accurate and slower.
         </p>
+        <div className="field">
+          <label htmlFor="ollama-url">Ollama address</label>
+          <input
+            id="ollama-url"
+            className="input"
+            style={{ maxWidth: 360 }}
+            value={s.ollamaUrl}
+            placeholder={status?.ollama.envUrl ?? "http://localhost:11434"}
+            spellCheck={false}
+            autoCapitalize="off"
+            onChange={(e) => setS({ ...s, ollamaUrl: e.target.value })}
+          />
+          <div className="hint">
+            The computer that runs Ollama — an IP address or name like <code>192.168.0.10</code> or <code>http://my-pc:11434</code> (port 11434 is added if you leave it out). Leave empty to use <code>OLLAMA_URL</code> from the <code>.env</code> file
+            {status ? ` (${status.ollama.envUrl})` : ""}. Save to switch, and the model lists below update.
+          </div>
+        </div>
         <div className="field">
           <label>Reading photos of recipes</label>
           <Seg

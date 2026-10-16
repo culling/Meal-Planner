@@ -25,7 +25,8 @@ export async function createApp(overrides: Partial<AppConfig> = {}): Promise<App
   const store = new DataStore(cfg);
   store.on("warning", (m) => console.warn(`[data] ${m}`));
   await store.init();
-  const ollama = new OllamaClient(cfg.ollamaUrl);
+  // the address set on the Settings page wins over OLLAMA_URL in .env
+  const ollama = new OllamaClient(() => store.getSettings().ollamaUrl || cfg.ollamaUrl);
   const fetcher = new PoliteFetcher(cfg);
   const jobs = new JobManager();
   const importer = new Importer(store, ollama, fetcher, jobs);

@@ -235,8 +235,39 @@ export interface Recipe {
 
 // ---------- Settings ----------
 
+/**
+ * Tidy an Ollama address typed by a person: "192.168.0.66" → "http://192.168.0.66:11434".
+ * A bare host gets Ollama's default port; an empty string means "use OLLAMA_URL from .env". Returns null if it isn't a usable address.
+ */
+export function normalizeOllamaUrl(raw: string): string | null {
+  const v = raw.trim();
+  if (!v) return "";
+  const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(v);
+  let url: URL;
+  try {
+    url = new URL(hasScheme ? v : `http://${v}`);
+  } catch {
+    return null;
+  }
+  if (!/^https?:$/.test(url.protocol) || !url.hostname) return null;
+  if (!hasScheme && !url.port) url.port = "11434";
+  return `${url.origin}${url.pathname}`.replace(/\/+$/, "");
+}
+
 export const SettingsSchema = z
   .object({
+    /** where Ollama runs, e.g. another computer on the network; empty = OLLAMA_URL from .env */
+    ollamaUrl: z
+      .string()
+      .transform((v, ctx) => {
+        const url = normalizeOllamaUrl(v);
+        if (url === null) {
+          ctx.addIssue({ code: "custom", message: `"${v}" isn't a valid address for Ollama (try something like 192.168.0.10 or http://my-pc:11434)` });
+          return z.NEVER;
+        }
+        return url;
+      })
+      .default(""),
     defaultPeople: z.number().default(2),
     weekStartsOn: z.enum(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]).default("monday"),
     mealSlots: z

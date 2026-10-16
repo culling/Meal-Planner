@@ -209,7 +209,7 @@ export function registerOtherRoutes(server: FastifyInstance, app: App) {
       dataDir: store.dataDir,
       recipes: store.listRecipes().length,
       problems: store.getProblems(),
-      ollama: { url: app.cfg.ollamaUrl, ...ollama },
+      ollama: { url: app.ollama.baseUrl, envUrl: app.cfg.ollamaUrl, ...ollama },
       lightOnOcr: app.cfg.lightOnOcrDir ? fs.existsSync(path.join(app.cfg.lightOnOcrDir, "ocr.py")) : false,
       git: { enabled: store.git.ready, history },
       today: todayYmd(),

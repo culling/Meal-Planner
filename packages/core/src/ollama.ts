@@ -25,9 +25,14 @@ export interface ChatJsonOptions<T> {
   numCtx?: number;
 }
 
-/** Minimal client for a local Ollama server. Everything stays on this machine. */
+/** Minimal client for a local Ollama server. Everything stays on your own network. */
 export class OllamaClient {
-  constructor(private baseUrl: string) {}
+  /** A function is read on every request, so a changed address takes effect without a restart. */
+  constructor(private address: string | (() => string)) {}
+
+  get baseUrl(): string {
+    return typeof this.address === "function" ? this.address() : this.address;
+  }
 
   async status(): Promise<{ ok: boolean; error?: string; models: OllamaModelInfo[] }> {
     try {

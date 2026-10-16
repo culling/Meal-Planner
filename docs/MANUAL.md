@@ -275,7 +275,7 @@ Make-ahead food goes on the shopping list but isn't counted in that day's calori
 - **Meals in a day**: breakfast, lunch and dinner by default. You can add *snack* or *dessert*.
 - **Fridge life to assume when a recipe doesn't say** (days)
 - **The week starts on**: any day
-- **Local AI**: the status of the Ollama connection, and which model reads photos, which tidies text, and which works out nutrition. You can also use **LightOnOCR + a text model** instead of a vision model, or turn AI nutrition off.
+- **Local AI**: the status of the Ollama connection, the **Ollama address** (the computer Ollama runs on — type an IP address like `192.168.0.10` or a name; leave it empty to use the one from `.env`), and which model reads photos, which tidies text, and which works out nutrition. You can also use **LightOnOCR + a text model** instead of a vision model, or turn AI nutrition off.
 - **Your data**: where the files are, and whether version history is on.
 
 ## 12. Your data, history and backups
@@ -311,7 +311,7 @@ The README has the [setup steps](../README.md#use-it-from-claude-mcp) and the li
 | Problem | Fix |
 |---|---|
 | The phone can't open the address | It must be on the same Wi-Fi. Allow port 3456 through Windows Firewall (see the README). |
-| "Ollama not connected" in Settings | Start Ollama, then press **Check again**. |
+| "Ollama not connected" in Settings | Start Ollama, check the **Ollama address** points at the computer running it, then press **Check again**. |
 | Reading a photo is slow | Local models take 20–80 seconds per page. A smaller model in Settings is faster but less accurate. |
 | A photo won't upload | It's probably HEIC. Save or share it as JPEG instead. |
 | The leftovers you want aren't in the list | Check that the cook meal has extra **Portions to cook**, and that the day you picked is within its safe date. |

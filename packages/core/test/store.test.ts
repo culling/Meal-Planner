@@ -134,6 +134,19 @@ describe("settings, foods, plans", () => {
     const text = await fs.readFile(path.join(ctx.dir, "settings.md"), "utf8");
     expect(text).toContain("defaultPeople: 3");
   });
+  it("tidies the Ollama address and rejects bad ones", async () => {
+    expect(ctx.store.getSettings().ollamaUrl).toBe("");
+    await ctx.store.updateSettings({ ollamaUrl: " 192.168.0.66 " });
+    expect(ctx.store.getSettings().ollamaUrl).toBe("http://192.168.0.66:11434");
+    await ctx.store.updateSettings({ ollamaUrl: "http://my-pc:8080/" });
+    expect(ctx.store.getSettings().ollamaUrl).toBe("http://my-pc:8080");
+    await ctx.store.updateSettings({ ollamaUrl: "my-pc:9000" });
+    expect(ctx.store.getSettings().ollamaUrl).toBe("http://my-pc:9000");
+    await expect(ctx.store.updateSettings({ ollamaUrl: "ftp://nope" })).rejects.toThrow(/valid address/);
+    expect(ctx.store.getSettings().ollamaUrl).toBe("http://my-pc:9000");
+    await ctx.store.updateSettings({ ollamaUrl: "" });
+    expect(ctx.store.getSettings().ollamaUrl).toBe("");
+  });
   it("stores foods in a Markdown file", async () => {
     await ctx.store.upsertFoods([{ id: "flour", name: "flour", per100g: { calories: 364, proteinG: 10, carbsG: 76, fatG: 1, saturatedFatG: 0.2, fibreG: 3, sugarG: 0.3, sodiumMg: 2 }, source: "manual" }]);
     expect(ctx.store.listFoods()).toHaveLength(1);

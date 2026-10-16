@@ -156,7 +156,7 @@ claude mcp add meal-planner -- node "C:/Users/culli/code/Meal Planner/packages/m
 
 ## Settings via `.env`
 
-See `.env.example` for `DATA_DIR`, `PORT`, `HOST`, `OLLAMA_URL`, `LIGHTONOCR_DIR` and `GIT_AUTOCOMMIT`. Models are chosen on the app's Settings page.
+See `.env.example` for `DATA_DIR`, `PORT`, `HOST`, `OLLAMA_URL`, `LIGHTONOCR_DIR` and `GIT_AUTOCOMMIT`. Models are chosen on the app's Settings page. The Ollama address can also be set there (handy when Ollama runs on another computer); it overrides `OLLAMA_URL`, which stays the fallback when the field is empty.
 
 ## Development
 
