@@ -1,4 +1,4 @@
-import { addDays, dateRangeLabel, isValidYmd, shiftWeek, todayYmd, type ShoppingItem } from "@mp/core/shared";
+import { addDays, dateRangeLabel, isValidYmd, isoWeekOf, shiftWeek, todayYmd, type ShoppingItem } from "@mp/core/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -12,7 +12,8 @@ export function ShoppingPage() {
   // with no date in the address, carry on with the latest list that covers today (built a few days ago), else start today
   const { data: saved } = useQuery({ queryKey: ["shopping", "lists"], queryFn: () => api.get<{ lists: string[] }>("/api/shopping-lists"), enabled: !param });
   if (!param && !saved) return <Loading />;
-  const current = saved?.lists.filter((id) => isValidYmd(id) && id <= today && today <= addDays(id, 6)).at(-1);
+  // (a list made per week before the plan went to rolling days is still used until that week is over)
+  const current = saved?.lists.filter((id) => isValidYmd(id) && id <= today && today <= addDays(id, 6)).at(-1) ?? saved?.lists.find((id) => id === isoWeekOf(today));
   return <ShoppingList key={param ?? current ?? today} week={param ?? current ?? today} />;
 }
 
