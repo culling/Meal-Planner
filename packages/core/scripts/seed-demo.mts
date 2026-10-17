@@ -10,7 +10,7 @@ import { Importer } from "../src/importer.ts";
 import { JobManager } from "../src/jobs.ts";
 import { Planner } from "../src/planner.ts";
 import { applyBreakdown } from "../src/nutrition.ts";
-import { addDays, isoWeekOf, todayYmd } from "../src/dates.ts";
+import { addDays, todayYmd } from "../src/dates.ts";
 import { DataStore } from "../src/store.ts";
 import type { PoliteFetcher } from "../src/webfetch.ts";
 
@@ -98,16 +98,16 @@ await store.photos.create({
 const done = await store.photos.create({ name: "Lemon Chicken", files: [{ data: await page("Lemon Chicken", ["600 g chicken thigh", "3 tbsp olive oil", "1 lemon, juiced"]), name: "lemon.jpg" }] });
 await store.photos.markDone(done.id, "cheese-on-toast");
 
-const week = isoWeekOf(todayYmd());
+// the plan page shows 7 days from today, so the demo plan starts today too (it may cross into next week's file)
+const today = todayYmd();
 const planner = new Planner(store);
-const monday = (await store.getPlan(week)).startDate;
-await planner.setPeople(week, {}, 3);
-await planner.setMeal(week, monday, "dinner", { recipe: "butter-chicken", type: "cook", portions: 6, cooked: false });
-await planner.setMeal(week, addDays(monday, 1), "lunch", { recipe: "butter-chicken", type: "leftovers", leftoverFrom: `${monday}/dinner`, people: 2 });
-await planner.setMeal(week, addDays(monday, 1), "dinner", { recipe: "chicken-fried-rice", type: "cook" });
-await planner.setPeople(week, { date: addDays(monday, 2) }, 5);
-await planner.setMeal(week, addDays(monday, 2), "dinner", { recipe: "spaghetti-bolognese", type: "cook" });
-await planner.setMeal(week, addDays(monday, 3), "dinner", { type: "eat-out", note: "Pizza night" });
-await planner.generateShopping(week);
+await planner.setPeople(today, {}, 3);
+await planner.setMeal(today, today, "dinner", { recipe: "butter-chicken", type: "cook", portions: 6, cooked: false });
+await planner.setMeal(today, addDays(today, 1), "lunch", { recipe: "butter-chicken", type: "leftovers", leftoverFrom: `${today}/dinner`, people: 2 });
+await planner.setMeal(today, addDays(today, 1), "dinner", { recipe: "chicken-fried-rice", type: "cook" });
+await planner.setPeople(today, { date: addDays(today, 2) }, 5);
+await planner.setMeal(today, addDays(today, 2), "dinner", { recipe: "spaghetti-bolognese", type: "cook" });
+await planner.setMeal(today, addDays(today, 3), "dinner", { type: "eat-out", note: "Pizza night" });
+await planner.generateShopping(today);
 await store.close();
 console.log(`Demo data written to ${cfg.dataDir}`);

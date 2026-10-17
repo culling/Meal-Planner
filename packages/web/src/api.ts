@@ -184,6 +184,11 @@ export function filtersFromParams(p: URLSearchParams): RecipeFilters {
 /** Browsing shows main dishes unless the person chooses otherwise. */
 export const DEFAULT_ROLE: ("main" | "side")[] = ["main"];
 
+/** The role tab to show: the one picked, else mains — but a search or a tag looks through everything (sides too). */
+export function shownRole(picked: RecipeFilters["role"], searching: boolean): ("main" | "side")[] {
+  return picked?.length ? picked : searching ? ["main", "side"] : DEFAULT_ROLE;
+}
+
 /** Number of filters (not counting search text and sorting) that are switched on. */
 export function activeFilterCount(f: RecipeFilters): number {
   const { q, sort, order, tagsMode, role, ...rest } = f;

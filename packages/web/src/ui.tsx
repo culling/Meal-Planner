@@ -187,16 +187,22 @@ export function Providers({ children }: { children: ReactNode }) {
 
 // ---------- building blocks ----------
 
+// Count open modals rather than saving/restoring body.overflow per modal: nested modals that close out of order
+// (or unmount together on navigation) would otherwise leave the page stuck with scrolling turned off.
+let openModals = 0;
+
 export function Modal({ title, onClose, children, wide }: { title: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean }) {
+  useEffect(() => {
+    openModals++;
+    document.body.style.overflow = "hidden";
+    return () => {
+      if (--openModals === 0) document.body.style.overflow = "";
+    };
+  }, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
-    };
+    return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>

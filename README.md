@@ -123,12 +123,12 @@ Point the app at another folder: `DATA_DIR=./test-data pnpm start` (in PowerShel
 - **Plan:**
   - **Dragging:** drag a meal's round handle along a row of slots to extend it (for example, lunch for the rest of the week), Ctrl-drag a meal to duplicate it, or drag it to move it. This works with a finger too (hold a meal to pick it up) and with taps, and every change has an Undo.
   - **Leftovers across days and weeks:** Sunday's dinner can feed Monday's lunch and Tuesday's dinner, even into next week, and the app cooks enough for everyone.
-  - **Week start:** the week can start on any day you choose in Settings, such as Saturday.
+  - **Starts today:** the plan shows the next 7 days from today, and steps back and forward 7 days at a time. Plans are saved one file per week (the week can start on any day you choose in Settings).
   - **Layout:** on a wide screen the plan is a table with a column per day and a row per meal; on a phone each day is a card. A slot can hold several dishes (a main and a side).
   - **Make ahead:** cook something on one day without eating it that day, using the row under the meals, then choose which later meals eat it. It warns if a meal would eat it past its safe date, and portions can be frozen.
-  - **People and calories:** people can be set per week, day and meal, and the UI always shows where a number came from. Quantities scale, and calories are shown per person per day.
-  - **Other tools:** mark meals cooked (this updates the cook log), copy a week, and suggest dinners.
-- **Shopping list:** generated from the week's cook meals, combined and scaled, and tickable on your phone.
+  - **People and calories:** people can be set for the days shown, a day or a meal, and the UI always shows where a number came from. Quantities scale, and calories are shown per person per day.
+  - **Other tools:** mark meals cooked (this updates the cook log), copy the 7 days before, and suggest dinners. Removing a cooked meal removes the leftovers planned from it.
+- **Shopping list:** generated from the cook meals in the 7 days shown, combined and scaled, and tickable on your phone.
 - **MCP server** so Claude Desktop and Claude Code can search recipes, plan the week, and more.
 
 ## Use it from Claude (MCP)
@@ -178,7 +178,7 @@ Save fixture pages: `pnpm --filter @mp/core exec tsx scripts/fetch-fixture.mts <
 - `e2e/nav.spec.ts` clicks through every page (phone tab bar and desktop sidebar) and checks each page really shows (no blank screen). It also covers reloads, Back/Forward, deep links and unknown addresses, both with data and on an empty install. Every e2e test also fails on any browser error.
 - `e2e/flows.spec.ts` covers real journeys: write a recipe, search and filters, favourite and hide, plan a meal, people overrides, cook extra and eat leftovers, mark cooked, shopping list ticks, the nutrition "?" markers, notes/rating/edit, importing from a link (mocked page), and settings.
 - `e2e/photos.spec.ts` covers saving photos (camera and gallery buttons), naming, reading later with a chosen model, typing it in, failures and delete. Set `LIVE_AI=1` to also read the real `_reference/Daal Curry.jpg` with your local model.
-- `e2e/weekstart.spec.ts` checks the plan layout (measured on screen) and switches the week start to Saturday and back without losing a meal.
+- `e2e/weekstart.spec.ts` checks the plan layout (measured on screen) and switches the week start to Saturday and back without losing a meal (the plan still starts today).
 - `e2e/makeahead.spec.ts` covers cooking ahead: smoothies drunk tomorrow, and muffins cooked tomorrow and eaten later in the week, with none eaten on the cooking day. It also covers freezing, too-late warnings, drag-to-eat, moving and shopping.
 - `e2e/plan-drag.spec.ts` covers the fill handle, Ctrl-drag, move, choose-slots mode, leftovers across weeks and undo, with a real mouse and real touch events.
 - `e2e/shots.spec.ts` takes screenshots of every page and main dialog at phone (Pixel 7) and desktop size.

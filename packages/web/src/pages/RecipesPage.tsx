@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { activeFilterCount, DEFAULT_ROLE, filtersFromParams, filtersToQuery, useRecipes } from "../api";
+import { activeFilterCount, filtersFromParams, filtersToQuery, shownRole, useRecipes } from "../api";
 import { FilterPanel, MISSING_LABELS, RecipeCard, RoleSeg, SORTS } from "../components";
 import { Filter, Search, X } from "../icons";
 import { Empty, ErrorBox, Loading, Modal, useDebounced } from "../ui";
@@ -8,10 +8,9 @@ import type { RecipeFilters } from "@mp/core/shared";
 
 export function RecipesPage() {
   const [params, setParams] = useSearchParams();
-  const filters = useMemo(() => {
-    const f = filtersFromParams(params);
-    return { ...f, role: f.role?.length ? f.role : DEFAULT_ROLE };
-  }, [params]);
+  // the address only holds a role tab once one is picked; until then it follows shownRole()
+  const picked = useMemo(() => filtersFromParams(params), [params]);
+  const filters = useMemo(() => ({ ...picked, role: shownRole(picked.role, !!picked.q?.trim() || !!picked.tags?.length) }), [picked]);
   const [search, setSearch] = useState(filters.q ?? "");
   const debounced = useDebounced(search, 250);
   const [sheet, setSheet] = useState(false);
@@ -21,7 +20,8 @@ export function RecipesPage() {
   const { data, error, isLoading, refetch } = useRecipes(effective);
 
   const update = (f: RecipeFilters) => {
-    const next = new URLSearchParams(filtersToQuery({ ...f, q: search.trim() || undefined }));
+    const role = f.role === filters.role ? picked.role : f.role; // only a tab that was clicked is kept
+    const next = new URLSearchParams(filtersToQuery({ ...f, role, q: search.trim() || undefined }));
     setParams(next, { replace: true });
   };
   const count = activeFilterCount(filters);
@@ -50,14 +50,14 @@ export function RecipesPage() {
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
-              const next = new URLSearchParams(filtersToQuery({ ...filters, q: e.target.value.trim() || undefined }));
+              const next = new URLSearchParams(filtersToQuery({ ...picked, q: e.target.value.trim() || undefined }));
               setParams(next, { replace: true });
             }}
           />
           {search && (
             <button className="btn icon ghost sm" style={{ position: "absolute", right: 4, top: 5 }} onClick={() => {
                 setSearch("");
-                setParams(new URLSearchParams(filtersToQuery({ ...filters, q: undefined })), { replace: true });
+                setParams(new URLSearchParams(filtersToQuery({ ...picked, q: undefined })), { replace: true });
               }}
               aria-label="Clear search"
             >

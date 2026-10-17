@@ -42,6 +42,17 @@ export async function shot(page: Page, name: string, opts: { full?: boolean } = 
   if (full) await page.setViewportSize(size);
 }
 
+/**
+ * The Monday `n` weeks after this week's, as YYYY-MM-DD. The plan shows 7 days from today, but it opens from any date, so
+ * tests that name weekdays ("Tuesday's lunch") open it on a Monday.
+ */
+export function mondayIn(n: number): string {
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + n * 7);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 /** Wait for the app to finish its first render (not a blank page). */
 export async function appReady(page: Page) {
   await expect(page.locator("#root")).not.toBeEmpty();

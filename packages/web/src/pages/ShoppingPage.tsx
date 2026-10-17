@@ -1,5 +1,5 @@
-import { dateRangeLabel, isoWeekOf, shiftWeek, todayYmd, type ShoppingItem } from "@mp/core/shared";
-import { useQueryClient } from "@tanstack/react-query";
+import { addDays, dateRangeLabel, isValidYmd, shiftWeek, todayYmd, type ShoppingItem } from "@mp/core/shared";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, useShopping } from "../api";
@@ -7,11 +7,20 @@ import { ChevL, ChevR, Copy, Plus, Refresh, Trash } from "../icons";
 import { CheckBox, Empty, ErrorBox, Loading, Modal, errMsg, useToast } from "../ui";
 
 export function ShoppingPage() {
-  const { week: weekParam } = useParams();
+  const { week: param } = useParams();
+  const today = todayYmd();
+  // with no date in the address, carry on with the latest list that covers today (built a few days ago), else start today
+  const { data: saved } = useQuery({ queryKey: ["shopping", "lists"], queryFn: () => api.get<{ lists: string[] }>("/api/shopping-lists"), enabled: !param });
+  if (!param && !saved) return <Loading />;
+  const current = saved?.lists.filter((id) => isValidYmd(id) && id <= today && today <= addDays(id, 6)).at(-1);
+  return <ShoppingList key={param ?? current ?? today} week={param ?? current ?? today} />;
+}
+
+/** A list is for the 7 days from a date, or (made before the plan went to rolling days) a week id such as 2026-W42. */
+function ShoppingList({ week }: { week: string }) {
   const nav = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
-  const week = weekParam ?? isoWeekOf(todayYmd());
   const { data: list, error, isLoading, refetch } = useShopping(week);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -35,7 +44,8 @@ export function ShoppingPage() {
     setBusy(true);
     try {
       qc.setQueryData(["shopping", week], await api.post(`/api/meal-plans/${week}/shopping-list`));
-      toast("Updated from this week's plan");
+      void qc.invalidateQueries({ queryKey: ["shopping", "lists"] });
+      toast("Updated from the plan");
     } catch (e) {
       toast(errMsg(e), "bad");
     } finally {
@@ -54,6 +64,7 @@ export function ShoppingPage() {
   const done = items.filter((i) => i.checked);
   const asText = () => open.map((i) => `• ${i.text}`).join("\n");
 
+  const step = (n: number) => (isValidYmd(week) ? addDays(week, n * 7) : shiftWeek(week, n));
   const row = (i: ShoppingItem) => (
     <div key={i.key} className={`shop-item ${i.checked ? "done" : ""}`} role="checkbox" aria-checked={i.checked} tabIndex={0} onClick={() => toggle(i.key)} onKeyDown={(e) => (e.key === " " || e.key === "Enter") && (e.preventDefault(), toggle(i.key))}>
       <CheckBox on={i.checked} />
@@ -81,16 +92,14 @@ export function ShoppingPage() {
   return (
     <>
       <div className="week-nav">
-        <button className="btn icon" onClick={() => nav(`/shopping/${shiftWeek(week, -1)}`)} aria-label="Previous week">
+        <button className="btn icon" onClick={() => nav(`/shopping/${step(-1)}`)} aria-label="Previous week">
           <ChevL />
         </button>
         <div className="title">
           Shopping list
-          <small>
-            Week {Number(week.slice(6))} · {dateRangeLabel(week)}
-          </small>
+          <small>{isValidYmd(week) ? dateRangeLabel(week) : `Week ${Number(week.slice(6))} · ${dateRangeLabel(week)}`}</small>
         </div>
-        <button className="btn icon" onClick={() => nav(`/shopping/${shiftWeek(week, 1)}`)} aria-label="Next week">
+        <button className="btn icon" onClick={() => nav(`/shopping/${step(1)}`)} aria-label="Next week">
           <ChevR />
         </button>
       </div>
@@ -109,7 +118,7 @@ export function ShoppingPage() {
         )}
       </div>
       <p className="small muted" style={{ margin: 0 }}>
-        Built from the meals you'll cook this week, scaled for the number of people. Ticks and your own items are kept when you update it.
+        Built from the meals you'll cook on these days, scaled for the number of people. Ticks and your own items are kept when you update it.
       </p>
 
       <div className="row">

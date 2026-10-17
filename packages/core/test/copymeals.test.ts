@@ -93,3 +93,20 @@ describe("copying meals", () => {
     await expect(planner.copyMeals(W, { from: { date: mon, slot: "lunch" }, to: [{ date: "2026-12-25", slot: "lunch" }] })).rejects.toThrow(/too far/);
   });
 });
+
+describe("removing a cooked meal", () => {
+  it("also removes the leftovers planned from it, even in the next week, and nothing else", async () => {
+    await planner.copyMeals(W, { from: { date: sun, slot: "dinner" }, to: [{ date: "2026-10-19", slot: "lunch" }, { date: "2026-10-20", slot: "dinner" }] });
+    await planner.setMeal("2026-W43", "2026-10-21", "dinner", { recipe: "curry", type: "cook" }); // cooked again, not leftovers
+    const view = await planner.setMeal(W, sun, "dinner", null);
+    expect(view.days[6].meals.dinner).toBeFalsy();
+    expect((await meals(W)).map((x) => [x.date, x.slot])).toEqual([[mon, "lunch"]]);
+    expect((await meals("2026-W43")).map((x) => [x.date, x.slot, x.m.type])).toEqual([["2026-10-21", "dinner", "cook"]]);
+  });
+
+  it("removing a leftovers meal leaves the cooking alone", async () => {
+    await planner.copyMeals(W, { from: { date: sun, slot: "dinner" }, to: [{ date: "2026-10-19", slot: "lunch" }] });
+    await planner.setMeal("2026-W43", "2026-10-19", "lunch", null);
+    expect((await meals(W)).find((x) => x.date === sun)?.m.type).toBe("cook");
+  });
+});

@@ -1,4 +1,4 @@
-import { addDays, parseYmd, weekDates } from "./dates";
+import { addDays, isValidYmd, parseYmd, weekDates, windowDates } from "./dates";
 import { extraSlotBase, isPrepSlot } from "./mealplan";
 import type { MealPlan, ShoppingList } from "./schemas";
 
@@ -10,8 +10,9 @@ export function dayLabel(ymd: string): string {
   return `${DAY[d.getDay()]} ${d.getDate()}`;
 }
 
-export function dateRangeLabel(week: string): string {
-  const dates = weekDates(week);
+/** "17–23 Oct 2026" for a week id, or for the 7 days starting on a date. */
+export function dateRangeLabel(weekOrStart: string): string {
+  const dates = isValidYmd(weekOrStart) ? windowDates(weekOrStart) : weekDates(weekOrStart);
   const a = parseYmd(dates[0]);
   const b = parseYmd(dates[6]);
   const sameMonth = a.getMonth() === b.getMonth();
@@ -62,7 +63,7 @@ export function renderShoppingBody(list: ShoppingList): string {
   const lines = [
     "<!-- Generated from the frontmatter above. Tick items in the app, or change [ ] to [x] here. -->",
     "",
-    `# Shopping list — ${list.week}`,
+    `# Shopping list — ${isValidYmd(list.week) ? dateRangeLabel(list.week) : list.week}`,
     "",
   ];
   for (const item of list.items) {

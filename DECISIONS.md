@@ -50,6 +50,9 @@ Changes from `recipe-planner-spec.md`, and judgement calls. Most recent answers 
 ## Plan layout and week start
 - Wide windows (≥ 1100 px): a table with **a column per day and a row per meal**. Phones and narrow windows keep **a card per day** — seven columns would be ~50 px wide on a phone, too small to read or drag. The same markup is used for both; only the CSS places things.
 - The week's first day is a setting (any day); see "Weeks" above for how ids and files follow it.
+- **The plan page shows 7 days from today** (2026-10-17), not a calendar week, and steps 7 days at a time from today. Storage is unchanged (one file per week): a window reads and writes whichever week files hold its days, and the API's `:week` parameter also accepts a window's first day (`/api/meal-plans/2026-10-17`). Old `/plan/2026-W42` links still open, from that week's first day. The week start setting now only decides how the files are grouped (and what the MCP tools call a week).
+- The window-wide actions work on the 7 days shown: "Copy the 7 days before", "Suggest meals", people for every day shown (stored as day overrides; going back to the default also clears any per-week number in those weeks), and the shopping list, which is saved under the window's first day (`shopping-lists/2026-10-17.md`). **Shop** opens the latest list that still covers today, so a list built on Saturday is the one you tick on Wednesday.
+- Removing a cook meal (or make-ahead) also removes every leftovers meal that eats it, in that week or any later one.
 
 ## Cooking ahead ("make ahead")
 - A make-ahead is stored like any cook meal, in a slot called `prep`, `prep-2`… on the day it is cooked, with `people: 0` (nobody eats it then) and an explicit `portions`. Nothing else needed a new concept: leftovers tracking, fridge/freezer expiry warnings, "cook enough for everyone", moving and the shopping list (whole batch) all follow. `prep…` can't be used as a normal meal name.

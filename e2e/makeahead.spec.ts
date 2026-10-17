@@ -1,5 +1,5 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
-import { expect, isPhone, shot, test } from "./helpers";
+import { expect, isPhone, mondayIn, shot, test } from "./helpers";
 
 // "Tomorrow I'm making peanut butter smoothies to drink, and cheese muffins for the rest of the week (and not eating any tomorrow)."
 // Cooking ahead gets its own row under breakfast / lunch / dinner; the meals that eat it are chosen separately.
@@ -29,9 +29,8 @@ test.beforeAll(async ({ request }) => {
 });
 
 async function weekAhead(page: Page, n: number, opts: { blank?: boolean } = {}) {
-  await page.goto("/plan");
-  for (let i = 0; i < n + (isPhone() ? 10 : 0); i++) await page.getByRole("button", { name: "Next week" }).click();
-  await expect(page).toHaveURL(/\/plan\/\d{4}-W\d{2}$/);
+  await page.goto(`/plan/${mondayIn(n + (isPhone() ? 10 : 0))}`);
+  await expect(page).toHaveURL(/\/plan\/\d{4}-\d{2}-\d{2}$/);
   await expect(page.locator(".day-head").first()).toBeVisible(); // the plan has loaded
   if (opts.blank !== false) await expect(page.locator(".meal-btn:not(.empty)")).toHaveCount(0);
 }
@@ -44,6 +43,7 @@ async function center(l: Locator) {
 async function addSmoothie(page: Page, d: number) {
   await slotCell(page, d, 0).locator(".meal-btn.empty").click();
   await page.getByRole("button", { name: "Choose a recipe" }).click();
+  await page.getByRole("dialog").getByRole("tab", { name: "All" }).click(); // the picker starts on mains
   await page.locator(".rcard", { hasText: "Peanut Butter Smoothie" }).click();
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(slotCell(page, d, 0).locator(".meal-btn", { hasText: "Peanut Butter Smoothie" })).toBeVisible();
@@ -204,7 +204,7 @@ test("the shopping list buys the whole batch", async ({ page }) => {
   await weekAhead(page, 30, { blank: false }); // the week with smoothie + muffins from the first test
   await page.getByRole("link", { name: "Shopping list" }).last().click();
   await page.getByRole("button", { name: /from the plan/ }).click();
-  await expect(page.getByText("Updated from this week's plan")).toBeVisible();
+  await expect(page.getByText("Updated from the plan")).toBeVisible();
   await expect(page.locator(".shop-item", { hasText: /flour/ })).toContainText(/300\s?g flour/); // the full batch of 12, not 2 people's worth
   await expect(page.locator(".shop-item", { hasText: /banana/ })).toBeVisible();
 });

@@ -5,7 +5,7 @@ import chokidar, { type FSWatcher } from "chokidar";
 import sharp from "sharp";
 import { ZodError } from "zod";
 import type { AppConfig } from "./config";
-import { todayYmd, weekDates, weekStartDate, isValidWeek, isoWeekOf, setWeekStart } from "./dates";
+import { todayYmd, weekDates, weekStartDate, isValidWeek, isValidYmd, isoWeekOf, setWeekStart } from "./dates";
 import { parseDoc, stringifyDoc, type ParsedDoc } from "./frontmatter";
 import {
   ConflictError,
@@ -815,9 +815,16 @@ export class DataStore extends EventEmitter {
   }
 
   // ---------- shopping lists ----------
+  // A list belongs to a week ("2026-W42") or to the 7 days starting on a date ("2026-10-17"); the field is still called week.
   shoppingFile(week: string) {
-    if (!isValidWeek(week)) throw new ValidationError(`Invalid week "${week}"`);
+    if (!isValidWeek(week) && !isValidYmd(week)) throw new ValidationError(`Invalid week "${week}"`);
     return path.join(this.shoppingDir, `${week}.md`);
+  }
+
+  /** Ids of the saved shopping lists, sorted. */
+  async listShoppingLists(): Promise<string[]> {
+    const files = await fs.readdir(this.shoppingDir).catch(() => []);
+    return files.filter((f) => f.endsWith(".md")).map((f) => f.slice(0, -3)).filter((id) => isValidWeek(id) || isValidYmd(id)).sort();
   }
 
   async getShoppingList(week: string): Promise<ShoppingList & { mtimeMs: number | null }> {

@@ -38,6 +38,14 @@ const draft = (photoId: string, title: string) => ({
 
 // the phone project only repeats the parts that differ on a phone (camera button, More page); the rest is the same page
 const desktopOnly = () => test.skip(isPhone(), "same screens as on the desktop");
+
+/** Pretend Ollama is up with a vision model, so these tests don't depend on a real Ollama being reachable. */
+async function ollamaUp(page: import("@playwright/test").Page) {
+  await page.route("**/api/status", async (route) => {
+    const status = await (await route.fetch()).json();
+    await route.fulfill({ json: { ...status, ollama: { ...status.ollama, ok: true, error: undefined, models: [{ name: "qwen3-vl:8b", sizeGb: 6.1, vision: true }] } } });
+  });
+}
 const title = () => (isPhone() ? "Gran's Scones" : "Gran's Pancakes");
 const slug = () => (isPhone() ? "grans-scones" : "grans-pancakes");
 
@@ -101,6 +109,7 @@ test("saved photos are listed, renamed, given a book, and can have pages added a
 
 test("read later with a model you pick; the result is checked, saved, and the photo is linked to the recipe", async ({ page }) => {
   desktopOnly();
+  await ollamaUp(page);
   let askedWith: unknown = null;
   await page.route("**/api/photos/daal-curry/read", async (route) => {
     askedWith = route.request().postDataJSON();
@@ -147,6 +156,7 @@ test("a failed reading keeps the photo and says what happened", async ({ page })
   await page.route("**/api/jobs/bad", (route) =>
     route.fulfill({ json: { id: "bad", label: "Reading", status: "error", progress: [], result: null, error: "Couldn't reach Ollama at http://localhost:11434", startedAt: 0, finishedAt: 1 } }),
   );
+  await ollamaUp(page);
   await page.goto("/photos/grans-pancakes");
   await page.getByRole("button", { name: "Read it now" }).click();
   await expect(page.getByText(/Reading didn't work: Couldn't reach Ollama/)).toBeVisible();

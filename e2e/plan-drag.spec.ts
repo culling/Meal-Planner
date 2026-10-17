@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { expect, isPhone, shot, test } from "./helpers";
+import { expect, isPhone, mondayIn, shot, test } from "./helpers";
 
 // Planning by dragging: extend a meal over other slots with the round handle, Ctrl+drag to duplicate, drag to move,
 // and "use this meal again" for leftovers (also across into next week). Each test uses its own blank week.
@@ -12,9 +12,8 @@ const meals = (page: Page) => page.locator(".meal-btn:not(.empty)");
 
 /** Open a blank week n weeks from now (the phone project uses weeks further out so it never meets the desktop's changes). */
 async function weekAhead(page: Page, n: number) {
-  await page.goto("/plan");
-  for (let i = 0; i < n + (isPhone() ? 10 : 0); i++) await page.getByRole("button", { name: "Next week" }).click();
-  await expect(page).toHaveURL(/\/plan\/\d{4}-W\d{2}$/);
+  await page.goto(`/plan/${mondayIn(n + (isPhone() ? 10 : 0))}`);
+  await expect(page).toHaveURL(/\/plan\/\d{4}-\d{2}-\d{2}$/);
   await expect(page.locator(".day-head").first()).toBeVisible(); // the plan has loaded
   await expect(meals(page)).toHaveCount(0);
 }
@@ -22,6 +21,7 @@ async function weekAhead(page: Page, n: number) {
 async function putMeal(page: Page, d: number, s: number, recipe: string) {
   await slotCell(page, d, s).locator(".meal-btn.empty").click();
   await page.getByRole("button", { name: "Choose a recipe" }).click();
+  await page.getByRole("dialog").getByRole("tab", { name: "All" }).click(); // the picker starts on mains
   await page.locator(".rcard", { hasText: recipe }).click();
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(slotCell(page, d, s).locator(".meal-btn", { hasText: recipe })).toBeVisible();
@@ -154,27 +154,34 @@ test.describe("with a mouse", () => {
 });
 
 test.describe("with taps and the dialog (works on a phone too)", () => {
-  test("Sunday's dinner feeds Monday lunch and Tuesday dinner of NEXT week as leftovers", async ({ page }) => {
+  test("the last day's dinner feeds lunch and dinner of the NEXT 7 days as leftovers", async ({ page }) => {
     await weekAhead(page, 6);
-    await putMeal(page, 6, 2, "Butter Chicken"); // Sunday dinner, the last day of the week
+    await putMeal(page, 6, 2, "Butter Chicken"); // dinner on the last day shown
+    const last = (await slotCell(page, 6, 2).getAttribute("data-slot-date"))!;
+    const after = (n: number) => {
+      const d = new Date(`${last}T12:00:00`);
+      d.setDate(d.getDate() + n);
+      return { day: d.toLocaleDateString("en-NZ", { weekday: "short" }), date: d.getDate() };
+    };
+    const [a, b] = [after(1), after(2)];
     await slotCell(page, 6, 2).locator(".meal-btn").click();
     await page.getByText("Use this meal again (leftovers or another cook)").click();
-    await page.getByRole("button", { name: /Mon \d+ lunch/ }).click(); // Monday of next week
-    await page.getByRole("button", { name: /Tue \d+ dinner/ }).click();
+    await page.getByRole("button", { name: new RegExp(`${a.day} ${a.date} lunch`) }).click(); // the next two days, off the page
+    await page.getByRole("button", { name: new RegExp(`${b.day} ${b.date} dinner`) }).click();
     await page.getByRole("button", { name: /^Fill 2 meals$/ }).click();
 
-    await expect(page.getByText(/leftovers on Mon lunch, Tue dinner/)).toBeVisible();
+    await expect(page.getByText(new RegExp(`leftovers on ${a.day} lunch, ${b.day} dinner`))).toBeVisible();
     await expect(page.getByText(/now cooking \d+ portions/)).toBeVisible();
     await expect(slotCell(page, 6, 2).locator(".meal-btn", { hasText: /\+\d+ extra/ })).toBeVisible();
 
-    await page.getByRole("button", { name: "Show that week" }).click();
+    await page.getByRole("button", { name: "Show those days" }).click();
     await expect(slotCell(page, 0, 1).locator(".meal-btn", { hasText: "Leftovers" })).toBeVisible();
     await expect(slotCell(page, 1, 2).locator(".meal-btn", { hasText: "Leftovers" })).toBeVisible();
-    await expect(slotCell(page, 1, 1).locator(".meal-btn.empty")).toBeVisible(); // Tuesday lunch was skipped, as asked
+    await expect(slotCell(page, 1, 1).locator(".meal-btn.empty")).toBeVisible(); // the second day's lunch was skipped, as asked
     await expect(page.locator(".notice.warn")).toHaveCount(0);
     await shot(page, "plan-leftovers-next-week");
 
-    // and the cook meal in the previous week still has its leftovers accounted for
+    // and the cook meal in the 7 days before still has its leftovers accounted for
     await page.getByRole("button", { name: "Previous week" }).click();
     await expect(page.locator(".notice.warn")).toHaveCount(0);
     await page.getByRole("button", { name: "Undo" }).isVisible().catch(() => false);

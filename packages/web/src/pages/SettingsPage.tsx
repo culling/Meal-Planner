@@ -69,7 +69,7 @@ export function SettingsPage() {
       <div className="card stack">
         <h2>Meals & people</h2>
         <div className="grid2">
-          <NumField label="People by default" value={s.defaultPeople} onChange={(n) => setS({ ...s, defaultPeople: n ?? 2 })} hint="You can override this for a whole week, a day, or a single meal." />
+          <NumField label="People by default" value={s.defaultPeople} onChange={(n) => setS({ ...s, defaultPeople: n ?? 2 })} hint="You can override this for the days shown on the plan, a single day, or a single meal." />
           <NumField label="Calorie target per person per day" unit="kcal" value={s.dailyCalorieTargetPerPerson} onChange={(n) => setS({ ...s, dailyCalorieTargetPerPerson: n })} hint="Shows how each day compares. Leave empty to skip." />
         </div>
         <div className="field">
@@ -87,7 +87,7 @@ export function SettingsPage() {
               </option>
             ))}
           </select>
-          <div className="hint">The plan and shopping list run for seven days from here — for example Saturday to Friday if that's when you start cooking for the week.</div>
+          <div className="hint">How the plan is grouped into weekly files on disk (and for the MCP tools). The plan page always shows seven days from today, whatever this is set to.</div>
         </div>
         <p className="small muted" style={{ margin: 0 }}>Measurements are metric.</p>
       </div>

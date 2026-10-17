@@ -91,6 +91,24 @@ export function shiftWeek(week: string, delta: number): string {
   return isoWeekOf(addDays(weekStartDate(week), delta * 7));
 }
 
+// ----- rolling 7-day windows -----
+// The plan page shows seven days from any date (today by default) and steps a week at a time from there, crossing the
+// stored weeks freely. Plans are still saved one file per week; a window just reads and writes the weeks it touches.
+
+export function windowDates(start: string): string[] {
+  return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+}
+
+/** First day of the window that contains `date`, counting whole weeks from `anchor` (today), so "next" and "back" line up. */
+export function windowStartFor(date: string, anchor = todayYmd()): string {
+  return addDays(anchor, Math.floor(diffDays(date, anchor) / 7) * 7);
+}
+
+/** The stored weeks that hold these dates, in date order. */
+export function weeksOf(dates: string[]): string[] {
+  return [...new Set(dates.map(isoWeekOf))];
+}
+
 export function isValidWeek(week: string): boolean {
   return /^\d{4}-W(0[1-9]|[1-4]\d|5[0-3])$/.test(week);
 }

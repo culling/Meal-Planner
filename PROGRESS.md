@@ -1,8 +1,8 @@
 # Progress
 
-_Latest:_ saved photos (name now, read later or type in), drag/extend/duplicate/move meals with leftovers across weeks, and Windows delete/rename while running fixed. See DECISIONS.md.
+_Latest:_ the plan and shopping list show 7 days from today; removing a cooked meal removes its leftovers; scrolling no longer gets stuck after closing nested dialogs; search and tag links look through sides too. See DECISIONS.md.
 
-Status of the milestones in `recipe-planner-spec.md` §14. All automated tests pass (`npm run test:all`: 122 core, 13 server/API, 3 MCP, and 86 end-to-end browser tests) and `pnpm typecheck` is clean.
+Status of the milestones in `recipe-planner-spec.md` §14. All automated tests pass (`npm run test:all`: 136 core, 13 server/API, 3 MCP, and 88 end-to-end browser tests) and `pnpm typecheck` is clean.
 
 1. **Core data layer — done.** zod schemas; recipe/settings/plan/shopping/food files read and written; unchanged files are never rewritten; unknown fields preserved; atomic writes with modified-time conflict checks; file watcher; in-memory search index; git auto-commit.
 2. **Manual recipes + web UI — done.** List, view, create, edit, favourite, hide, notes (add/edit/delete), photo upload (main, step, "I made this"), raw Markdown editor, version history/restore, rename folder, delete to `.trash`.

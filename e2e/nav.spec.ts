@@ -31,7 +31,7 @@ function destinations(): Dest[] {
   const phone = isPhone();
   const main: Dest[] = [
     { name: "Recipes", go: (p) => nav(p, "Recipes").click(), url: /\/$/, shows: (p) => heading(p, "Recipes") },
-    { name: "Plan", go: (p) => nav(p, "Plan").click(), url: /\/plan$/, shows: (p) => weekTitle(p, /Week \d+/) },
+    { name: "Plan", go: (p) => nav(p, "Plan").click(), url: /\/plan$/, shows: (p) => weekTitle(p, /Today onwards/) },
     { name: "Add recipe", go: (p) => nav(p, phone ? "Add" : "Add recipe").click(), url: /\/import$/, shows: (p) => heading(p, "Add a recipe") },
     { name: "Shopping list", go: (p) => nav(p, phone ? "Shop" : "Shopping list").click(), url: /\/shopping$/, shows: (p) => weekTitle(p, /Shopping list/) },
   ];
@@ -97,7 +97,7 @@ for (const [label, base] of [
 
     test("opening an address directly shows the page (no blank screen on a deep link)", async ({ page }) => {
       for (const [url, shows] of [
-        ["/plan", (p: Page) => weekTitle(p, /Week \d+/)],
+        ["/plan", (p: Page) => weekTitle(p, /Today onwards/)],
         ["/shopping", (p: Page) => weekTitle(p, /Shopping list/)],
         ["/nutrition", (p: Page) => heading(p, "Nutrition data")],
         ["/settings", (p: Page) => heading(p, "Settings")],
@@ -130,20 +130,33 @@ test.describe("navigation inside the demo recipes", () => {
     await page.getByRole("button", { name: "Back" }).click();
     await expect(heading(page, "Recipes")).toBeVisible();
 
+    // the plan starts today and steps 7 days at a time
     await nav(page, "Plan").click();
     const title = page.locator(".week-nav .title");
-    const week = Number((await title.innerText()).match(/Week (\d+)/)![1]);
+    await expect(title).toContainText("Today onwards");
+    await expect(page.locator(".day").first()).toHaveClass(/today/);
     await page.getByRole("button", { name: "Next week" }).click();
-    await expect(page).toHaveURL(/\/plan\/\d{4}-W\d{2}$/);
-    await expect(title).toContainText(`Week ${week + 1}`);
+    await expect(page).toHaveURL(/\/plan\/\d{4}-\d{2}-\d{2}$/);
+    await expect(title).toContainText("Next week");
+    await expect(page.locator(".day.today")).toHaveCount(0);
     await page.getByRole("button", { name: "Previous week" }).click();
-    await expect(title).toContainText(`Week ${week}`);
+    await expect(page).toHaveURL(/\/plan$/);
+    await expect(title).toContainText("Today onwards");
+    await page.getByRole("button", { name: "Previous week" }).click();
+    await expect(title).toContainText("Last week");
+    await page.getByRole("button", { name: "Today", exact: true }).click();
+    await expect(title).toContainText("Today onwards");
     await page.getByRole("button", { name: "Next week" }).click();
     await page.reload();
-    await expect(weekTitle(page, /Week \d+/)).toBeVisible();
+    await expect(weekTitle(page, /Next week/)).toBeVisible();
+    // an old week link still opens, from that week's first day
+    await page.goto("/plan/2026-W10");
+    await expect(page.locator(".week-nav small")).toContainText("Mar 2026");
 
+    await page.goto("/plan");
+    await page.getByRole("button", { name: "Next week" }).click();
     await page.locator(".main").getByRole("link", { name: "Shopping list", exact: true }).click();
-    await expect(page).toHaveURL(/\/shopping\/\d{4}-W\d{2}$/);
+    await expect(page).toHaveURL(/\/shopping\/\d{4}-\d{2}-\d{2}$/);
     await expect(weekTitle(page, /Shopping list/)).toBeVisible();
   });
 
@@ -158,5 +171,17 @@ test.describe("navigation inside the demo recipes", () => {
     await page.getByRole("link", { name: "#quick" }).click();
     await expect(page).toHaveURL(/\/\?tags=quick/);
     await expect(page.locator(".rcard")).toHaveCount(1);
+  });
+
+  test("Escape closes a recipe picker and its meal dialog together, and the page still scrolls", async ({ page }) => {
+    await page.goto("/plan");
+    await page.locator(".meal-btn.empty").first().click();
+    await page.getByRole("button", { name: "Choose a recipe" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(2);
+    await page.keyboard.press("Escape"); // both dialogs listen for it and close at once
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe("");
+    await page.mouse.wheel(0, 600);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
   });
 });

@@ -12,6 +12,7 @@ import {
   applyBreakdown,
   estimateFood,
   isValidWeek,
+  isValidYmd,
   isoWeekOf,
   slugify,
   todayYmd,
@@ -71,14 +72,15 @@ export function registerOtherRoutes(server: FastifyInstance, app: App) {
   });
 
   // ---------- meal plans ----------
+  // ":week" is a stored week ("2026-W42") or the first day of a 7-day window ("2026-10-17"), which the plan page uses
   const week = (w: string) => {
-    if (!isValidWeek(w)) throw new ValidationError(`Invalid week "${w}"`);
+    if (!isValidWeek(w) && !isValidYmd(w)) throw new ValidationError(`Invalid week "${w}"`);
     return w;
   };
 
   server.get("/api/meal-plans", async () => ({ weeks: await store.listPlanWeeks(), current: isoWeekOf(todayYmd()) }));
 
-  server.get<{ Params: { week: string } }>("/api/meal-plans/:week", async (req) => planner.view(week(req.params.week)));
+  server.get<{ Params: { week: string } }>("/api/meal-plans/:week", async (req) => (isValidYmd(req.params.week) ? planner.window(req.params.week) : planner.view(week(req.params.week))));
 
   /** Replace a whole plan (raw frontmatter structure). The UI mostly uses the finer-grained routes below. */
   server.put<{ Params: { week: string } }>("/api/meal-plans/:week", async (req) => {
@@ -123,13 +125,14 @@ export function registerOtherRoutes(server: FastifyInstance, app: App) {
 
   server.post<{ Params: { week: string } }>("/api/meal-plans/:week/copy-from", async (req) => {
     const { from, overwrite } = z.object({ from: z.string(), overwrite: z.boolean().optional() }).parse(req.body);
+    if (isValidYmd(req.params.week)) return planner.copyDays(week(from), req.params.week, !!overwrite);
     return planner.copyWeek(week(from), week(req.params.week), !!overwrite);
   });
 
   server.post<{ Params: { week: string } }>("/api/meal-plans/:week/suggest", async (req) => {
     const { save, seed } = z.object({ save: z.boolean().optional(), seed: z.number().optional() }).parse(req.body ?? {});
     const res = await planner.suggest(week(req.params.week), { save, seed });
-    return { notes: res.notes, saved: res.saved, view: res.saved ? await planner.view(req.params.week) : null, plan: res.plan };
+    return { notes: res.notes, saved: res.saved, view: res.saved ? await (isValidYmd(req.params.week) ? planner.window(req.params.week) : planner.view(req.params.week)) : null, plan: res.plan };
   });
 
   server.get<{ Querystring: { date?: string; slot?: string } }>("/api/leftovers", async (req) => ({
@@ -137,6 +140,7 @@ export function registerOtherRoutes(server: FastifyInstance, app: App) {
   }));
 
   // ---------- shopping list ----------
+  server.get("/api/shopping-lists", async () => ({ lists: await store.listShoppingLists() }));
   server.get<{ Params: { week: string } }>("/api/meal-plans/:week/shopping-list", async (req) => store.getShoppingList(week(req.params.week)));
   server.post<{ Params: { week: string } }>("/api/meal-plans/:week/shopping-list", async (req) => planner.generateShopping(week(req.params.week)));
   server.put<{ Params: { week: string } }>("/api/meal-plans/:week/shopping-list", async (req) => {

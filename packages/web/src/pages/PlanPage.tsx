@@ -6,10 +6,12 @@ import {
   baseSlot,
   freeExtraSlot,
   freePrepSlot,
+  diffDays,
   isPrepSlot,
-  isoWeekOf,
-  shiftWeek,
+  isValidWeek,
   todayYmd,
+  weekStartDate,
+  windowStartFor,
   type Meal,
   type MealType,
   type PeopleSource,
@@ -32,14 +34,25 @@ const TYPE_LABEL: Record<MealType, string> = { cook: "Cook", leftovers: "Leftove
 const SOURCE_LABEL: Record<PeopleSource, string> = { meal: "set for this meal", day: "set for this day", week: "this week's default", settings: "default from settings" };
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+/** "Today onwards", "Next week", "In 3 weeks", "Last week", "2 weeks ago" — for a window starting on a whole-week step from today. */
+function windowTitle(start: string, today: string): string {
+  const weeks = Math.round(diffDays(start, today) / 7);
+  if (start === today) return "Today onwards";
+  if (diffDays(start, today) % 7 !== 0) return "7 days";
+  if (weeks === 1) return "Next week";
+  if (weeks === -1) return "Last week";
+  return weeks > 0 ? `In ${weeks} weeks` : `${-weeks} weeks ago`;
+}
+
 export function PlanPage() {
-  const { week: weekParam } = useParams();
+  const { week: param } = useParams();
   const nav = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
   const confirm = useConfirm();
   const today = todayYmd();
-  const week = weekParam ?? isoWeekOf(today);
+  // the page shows 7 days from `week`: today unless the address says another date (or an old week link, e.g. 2026-W42)
+  const week = !param ? today : isValidWeek(param) ? weekStartDate(param) : param;
   const { data: view, error, isLoading, refetch } = usePlan(week);
   const [dialog, setDialog] = useState<{ date: string; slot: string } | null>(null);
   const [peopleEdit, setPeopleEdit] = useState<{ level: "week" | "day"; date?: string } | null>(null);
@@ -51,7 +64,7 @@ export function PlanPage() {
   type CopyMode = "auto" | "repeat" | "leftovers" | "move";
   interface CopyReply {
     view: PlanView;
-    result: { mode: "repeat" | "leftovers" | "move" };
+    result: { mode: "repeat" | "leftovers" | "move"; placed: SlotRef[] };
     undo: { plans: unknown[] };
     message: string;
     weeks: string[];
@@ -76,7 +89,7 @@ export function PlanPage() {
       const r = await api.post<CopyReply>(`/api/meal-plans/${week}/copy`, { from, to, mode });
       setView(r.view);
       refreshPlans();
-      const otherWeek = r.weeks.find((w) => w !== week);
+      const outside = r.result.placed.map((p) => p.date).find((d) => d < r.view.startDate || d > r.view.endDate);
       const actions: { label: string; onClick: () => void }[] = [{ label: "Undo", onClick: () => void undoCopy(r) }];
       if (mode === "auto" && (r.result.mode === "leftovers" || r.result.mode === "repeat")) {
         const other: CopyMode = r.result.mode === "leftovers" ? "repeat" : "leftovers";
@@ -89,7 +102,7 @@ export function PlanPage() {
             })(),
         });
       }
-      if (otherWeek) actions.push({ label: "Show that week", onClick: () => nav(`/plan/${otherWeek}`) });
+      if (outside) actions.push({ label: "Show those days", onClick: () => nav(`/plan/${windowStartFor(outside, week)}`) });
       toast(r.message, "ok", { actions });
     } catch (e) {
       toast(errMsg(e), "bad");
@@ -124,56 +137,60 @@ export function PlanPage() {
     act(async () => {
       const v = await api.put<PlanView>(`/api/meal-plans/${week}/days/${date}/meals/${slot}`, { meal, expectedMtimeMs: undefined });
       setView(v);
+      if (meal === null) void qc.invalidateQueries({ queryKey: ["plan"] }); // its leftovers may have gone from later weeks too
       void qc.invalidateQueries({ queryKey: ["shopping"] });
       return v;
     });
 
   const copyLast = async () => {
-    const from = shiftWeek(week, -1);
     let overwrite = false;
     if (!empty) {
-      if (!(await confirm({ title: "Replace this week's plan?", message: `This week already has meals. Copying last week's plan replaces them.`, confirmLabel: "Replace", danger: true }))) return;
+      if (!(await confirm({ title: "Replace these days' meals?", message: `These 7 days already have meals. Copying the 7 days before replaces them.`, confirmLabel: "Replace", danger: true }))) return;
       overwrite = true;
     }
-    const v = await act(() => api.post<PlanView>(`/api/meal-plans/${week}/copy-from`, { from, overwrite }), "Copied last week's plan");
+    const v = await act(() => api.post<PlanView>(`/api/meal-plans/${week}/copy-from`, { from: view.prevStart, overwrite }), "Copied the 7 days before");
     if (v) setView(v);
   };
 
+  // people for the days shown: one number when every day agrees
+  const dayPeople = new Set(view.days.map((d) => d.people.value));
+  const allSet = view.days.every((d) => d.people.from === "day");
+  const allDefault = view.days.every((d) => d.people.from === "settings");
   const slots = view.slots;
   return (
     <>
       <div className="week-nav">
-        <button className="btn icon" onClick={() => nav(`/plan/${view.prevWeek}`)} aria-label="Previous week">
+        <button className="btn icon" onClick={() => nav(view.prevStart === today ? "/plan" : `/plan/${view.prevStart}`)} aria-label="Previous week">
           <ChevL />
         </button>
         <div className="title">
-          Week {Number(week.slice(6))}
+          {windowTitle(week, today)}
           <small>{dateRangeLabel(week)}</small>
         </div>
-        <button className="btn icon" onClick={() => nav(`/plan/${view.nextWeek}`)} aria-label="Next week">
+        <button className="btn icon" onClick={() => nav(view.nextStart === today ? "/plan" : `/plan/${view.nextStart}`)} aria-label="Next week">
           <ChevR />
         </button>
       </div>
 
       <div className="row wrap">
-        {week !== isoWeekOf(today) && (
+        {week !== today && (
           <button className="btn sm" onClick={() => nav("/plan")}>
-            This week
+            Today
           </button>
         )}
         <button className="btn sm" onClick={() => setPeopleEdit({ level: "week" })}>
           <Users style={{ width: 17, height: 17 }} />
-          {view.defaultPeople != null ? <b>{view.defaultPeople} people</b> : <span className="muted">{view.settingsPeople} people</span>}
-          <span className="muted small">{view.defaultPeople != null ? "this week" : "(default)"}</span>
+          {dayPeople.size > 1 ? <b>People</b> : allDefault ? <span className="muted">{view.days[0].people.value} people</span> : <b>{view.days[0].people.value} people</b>}
+          <span className="muted small">{dayPeople.size > 1 ? "varies" : allDefault ? "(default)" : allSet ? "these days" : ""}</span>
         </button>
         <span className="grow" />
         <button className="btn sm" onClick={copyLast}>
-          <Copy /> Copy last week
+          <Copy /> Copy the 7 days before
         </button>
         <button className="btn sm" onClick={() => setSuggest(true)}>
           <Sparkle /> Suggest meals
         </button>
-        <Link className="btn sm soft" to={`/shopping/${week}`}>
+        <Link className="btn sm soft" to={week === today ? "/shopping" : `/shopping/${week}`}>
           <Cart /> Shopping list
         </Link>
       </div>
@@ -197,9 +214,9 @@ export function PlanPage() {
       {empty && (
         <div className="card center" style={{ padding: 24 }}>
           <div style={{ fontSize: "2rem" }}>🗓️</div>
-          <b>Nothing planned for this week yet</b>
+          <b>Nothing planned for these days yet</b>
           <p className="muted small" style={{ margin: "4px 0 12px" }}>
-            Tap any slot below to choose a meal, copy last week, or let it suggest some dinners.
+            Tap any slot below to choose a meal, copy the 7 days before, or let it suggest some dinners.
           </p>
         </div>
       )}
@@ -463,7 +480,10 @@ export function PlanPage() {
           onClose={() => setPeopleEdit(null)}
           onSet={async (value) => {
             const v = await act(() => (peopleEdit.level === "week" ? api.patch<PlanView>(`/api/meal-plans/${week}`, { defaultPeople: value }) : api.patch<PlanView>(`/api/meal-plans/${week}/days/${peopleEdit.date}`, { people: value })));
-            if (v) setView(v);
+            if (v) {
+              setView(v);
+              void qc.invalidateQueries({ queryKey: ["shopping"] });
+            }
           }}
         />
       )}
@@ -571,15 +591,18 @@ function RecipeDock({ onPick }: { onPick: (r: RecipeSummary) => void }) {
 
 function PeopleModal({ view, level, date, onClose, onSet }: { view: PlanView; level: "week" | "day"; date?: string; onClose: () => void; onSet: (v: number | null) => Promise<void> }) {
   const day = view.days.find((d) => d.date === date);
-  const current = level === "week" ? view.defaultPeople : day?.dayOverride ?? null;
-  const inherited = level === "week" ? view.settingsPeople : (view.defaultPeople ?? view.settingsPeople);
-  const inheritedFrom = level === "week" ? "settings" : view.defaultPeople != null ? "this week's default" : "settings";
+  // "week" here means the 7 days shown: setting it sets each day, and going back clears them (and any older per-week number)
+  const shared = new Set(view.days.map((d) => d.people.value)).size === 1 ? view.days[0].people.value : null;
+  const anySet = view.days.some((d) => d.people.from === "day" || d.people.from === "week");
+  const current = level === "week" ? (anySet ? shared ?? view.days[0].people.value : null) : day?.dayOverride ?? null;
+  const inherited = level === "week" ? view.settingsPeople : (day?.weekPeople ?? view.settingsPeople);
+  const inheritedFrom = level === "week" || day?.weekPeople == null ? "settings" : "this week's default";
   const [v, setV] = useState(current ?? inherited);
   return (
-    <Modal title={level === "week" ? "People this week" : `People on ${dayLabel(date!)}`} onClose={onClose}>
+    <Modal title={level === "week" ? "People on these days" : `People on ${dayLabel(date!)}`} onClose={onClose}>
       <div className="stack">
         <p className="muted small" style={{ margin: 0 }}>
-          {level === "week" ? "Used for every meal this week unless a day or meal says otherwise." : "Used for every meal on this day unless a meal says otherwise."} Cooking amounts are scaled to match.
+          {level === "week" ? "Used for every meal on these 7 days unless a meal says otherwise." : "Used for every meal on this day unless a meal says otherwise."} Cooking amounts are scaled to match.
         </p>
         <div className="row">
           <Stepper value={v} onChange={setV} min={0} max={30} />

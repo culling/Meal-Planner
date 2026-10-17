@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { MealPlanSchema, NotFoundError, ValidationError, isValidWeek, type App } from "@mp/core";
+import { MealPlanSchema, NotFoundError, ValidationError, isValidWeek, isValidYmd, type App } from "@mp/core";
 import { readMultipart } from "./util";
 
 const SlotRef = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), slot: z.string().min(1) });
@@ -99,7 +99,7 @@ export function registerPhotoRoutes(server: FastifyInstance, app: App) {
 
   // ---------- meals: copy / fill / move, and undo ----------
   const week = (w: string) => {
-    if (!isValidWeek(w)) throw new ValidationError(`Invalid week "${w}"`);
+    if (!isValidWeek(w) && !isValidYmd(w)) throw new ValidationError(`Invalid week "${w}"`);
     return w;
   };
 

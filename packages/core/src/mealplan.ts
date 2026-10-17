@@ -275,26 +275,30 @@ export function dailyTotals(
 
 /** Copy a plan to another week: dates shift, cooked/frozen state resets, people overrides stay. */
 export function copyPlan(source: MealPlan, targetWeek: string): MealPlan {
-  const shift = diffDays(weekStartDate(targetWeek), weekStartDate(source.week));
-  const shiftKey = (k: string | null) => {
-    const p = k ? splitMealKey(k) : null;
-    return p ? mealKey(addDays(p.date, shift), p.slot) : k;
-  };
   return {
     week: targetWeek,
     startDate: weekStartDate(targetWeek),
     defaultPeople: source.defaultPeople,
-    days: source.days.map((d) => ({
-      ...d,
-      date: addDays(d.date, shift),
-      meals: Object.fromEntries(
-        Object.entries(d.meals).map(([slot, m]) => [
-          slot,
-          m ? { ...m, cooked: false, frozen: [], leftoverFrom: shiftKey(m.leftoverFrom) } : m,
-        ]),
-      ),
-    })),
+    days: shiftDays(source.days, diffDays(weekStartDate(targetWeek), weekStartDate(source.week))),
   };
+}
+
+/** Days moved `shift` days later as fresh, uncooked plans (leftovers keep pointing at the same, moved, cook). */
+export function shiftDays(days: DayPlan[], shift: number): DayPlan[] {
+  const shiftKey = (k: string | null) => {
+    const p = k ? splitMealKey(k) : null;
+    return p ? mealKey(addDays(p.date, shift), p.slot) : k;
+  };
+  return days.map((d) => ({
+    ...d,
+    date: addDays(d.date, shift),
+    meals: Object.fromEntries(
+      Object.entries(d.meals).map(([slot, m]) => [
+        slot,
+        m ? { ...m, cooked: false, frozen: [], leftoverFrom: shiftKey(m.leftoverFrom) } : m,
+      ]),
+    ),
+  }));
 }
 
 // ---------- shopping list ----------

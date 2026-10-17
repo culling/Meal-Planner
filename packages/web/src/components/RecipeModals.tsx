@@ -1,4 +1,4 @@
-import { isoWeekOf, todayYmd, type Leftovers } from "@mp/core/shared";
+import { isoWeekOf, todayYmd, windowStartFor, type Leftovers } from "@mp/core/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -48,7 +48,8 @@ export function AddToPlanModal({ recipe, onClose }: { recipe: RecipeFull; onClos
       void qc.invalidateQueries({ queryKey: ["plan"] });
       toast(`Added to ${fmtDate(date)}`);
       onClose();
-      nav(`/plan/${week}`);
+      const start = windowStartFor(date); // the plan page counts 7-day steps from today
+      nav(start === todayYmd() ? "/plan" : `/plan/${start}`);
     } catch (e) {
       toast(errMsg(e), "bad");
       setBusy(false);

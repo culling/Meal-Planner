@@ -1,16 +1,17 @@
 import type { RecipeFilters } from "@mp/core/shared";
 import { useState } from "react";
-import { DEFAULT_ROLE, useRecipes, type RecipeSummary } from "../api";
+import { shownRole, useRecipes, type RecipeSummary } from "../api";
 import { FilterPanel, RecipeCard, RoleSeg } from "../components";
 import { Filter, Search } from "../icons";
 import { Empty, Loading, Modal, useDebounced } from "../ui";
 
 /** Choose a recipe, with the same filters as the main list (calories, time, leftovers, tags…). */
 export function RecipePicker({ onPick, onClose, title = "Pick a recipe", initial }: { onPick: (r: RecipeSummary) => void; onClose: () => void; title?: string; initial?: RecipeFilters }) {
-  const [filters, setFilters] = useState<RecipeFilters>({ role: DEFAULT_ROLE, ...initial });
+  const [picked, setPicked] = useState<RecipeFilters>({ ...initial });
   const [q, setQ] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const dq = useDebounced(q, 250);
+  const filters: RecipeFilters = { ...picked, role: shownRole(picked.role, !!dq.trim() || !!picked.tags?.length) };
   const { data, isLoading } = useRecipes({ ...filters, q: dq.trim() || undefined });
   const active = Object.entries(filters).filter(([k, v]) => !["sort", "order", "q", "role"].includes(k) && v !== undefined && !(Array.isArray(v) && !v.length)).length;
   return (
@@ -26,23 +27,23 @@ export function RecipePicker({ onPick, onClose, title = "Pick a recipe", initial
           </button>
         </div>
         <div className="row wrap">
-          <RoleSeg value={filters.role} onChange={(role) => setFilters({ ...filters, role })} />
-          <button className={`chip ${filters.favoritesOnly ? "on" : ""}`} style={{ cursor: "pointer" }} onClick={() => setFilters({ ...filters, favoritesOnly: filters.favoritesOnly ? undefined : true })}>
+          <RoleSeg value={filters.role} onChange={(role) => setPicked({ ...picked, role })} />
+          <button className={`chip ${filters.favoritesOnly ? "on" : ""}`} style={{ cursor: "pointer" }} onClick={() => setPicked({ ...picked, favoritesOnly: filters.favoritesOnly ? undefined : true })}>
             ♥ Favourites
           </button>
-          <button className={`chip ${filters.notCookedInDays ? "on" : ""}`} style={{ cursor: "pointer" }} onClick={() => setFilters({ ...filters, notCookedInDays: filters.notCookedInDays ? undefined : 14 })}>
+          <button className={`chip ${filters.notCookedInDays ? "on" : ""}`} style={{ cursor: "pointer" }} onClick={() => setPicked({ ...picked, notCookedInDays: filters.notCookedInDays ? undefined : 14 })}>
             Not cooked lately
           </button>
-          <button className={`chip ${filters.fridgeDaysMin ? "on" : ""}`} style={{ cursor: "pointer" }} onClick={() => setFilters({ ...filters, fridgeDaysMin: filters.fridgeDaysMin ? undefined : 3 })}>
+          <button className={`chip ${filters.fridgeDaysMin ? "on" : ""}`} style={{ cursor: "pointer" }} onClick={() => setPicked({ ...picked, fridgeDaysMin: filters.fridgeDaysMin ? undefined : 3 })}>
             Keeps 3+ days
           </button>
-          <button className={`chip ${filters.maxTotalMinutes === 30 ? "on" : ""}`} style={{ cursor: "pointer" }} onClick={() => setFilters({ ...filters, maxTotalMinutes: filters.maxTotalMinutes === 30 ? undefined : 30 })}>
+          <button className={`chip ${filters.maxTotalMinutes === 30 ? "on" : ""}`} style={{ cursor: "pointer" }} onClick={() => setPicked({ ...picked, maxTotalMinutes: filters.maxTotalMinutes === 30 ? undefined : 30 })}>
             Under 30 min
           </button>
         </div>
         {showFilters && (
           <div className="card tint">
-            <FilterPanel value={filters} onChange={setFilters} />
+            <FilterPanel value={filters} onChange={(f) => setPicked({ ...f, role: f.role === filters.role ? picked.role : f.role })} />
           </div>
         )}
         {isLoading && <Loading />}

@@ -45,9 +45,9 @@ On a wide screen the menu runs down the left side. On a phone there's a tab bar 
 | Page | What it's for |
 |---|---|
 | **Recipes** | Your collection: search, filter, open a recipe |
-| **Plan** | This week's meals, people, calories and leftovers |
+| **Plan** | The next 7 days' meals, people, calories and leftovers |
 | **Add recipe** | Import from a link, several links, or photos of a cookbook |
-| **Shopping list** | Everything to buy for the week's cooking |
+| **Shopping list** | Everything to buy for the next 7 days' cooking |
 | **Saved photos** | Cookbook photos waiting to be read or typed in (the badge shows how many) |
 | **Write a recipe** | Type a recipe in from scratch |
 | **Nutrition data** | The food database behind the calorie numbers |
@@ -170,7 +170,7 @@ Every food the app knows about is stored per 100 g on the **Nutrition data** pag
 
 ![The plan](screenshots/desktop-plan.png)
 
-On a wide screen the plan is a table, with a column per day and a row per meal. On a phone each day is a card. Use the arrows to move between weeks.
+The plan always opens on **today** and shows the next 7 days. On a wide screen it is a table, with a column per day and a row per meal. On a phone each day is a card. Use the arrows to go back or forward 7 days at a time, and **Today** to jump back.
 
 ### Putting meals on the plan
 
@@ -196,7 +196,7 @@ When you copy a cook meal, the app works out a sensible default (**Smart** mode)
 
 ### People
 
-People can be set at three levels, and the most specific one wins: **the meal**, then **the day**, then **the week**, then the default in Settings. The app always shows where a number came from. A pencil mark means it was changed for that day or meal.
+People can be set for **a meal**, **a day**, or **all 7 days shown** (the people button above the plan), and the most specific one wins, then the default in Settings. The app always shows where a number came from. A pencil mark means it was changed for that day or meal.
 
 ![People](screenshots/desktop-plan-people.png)
 
@@ -209,14 +209,12 @@ Each day's header shows calories **per person**. If you set a daily target in Se
 ### Marking meals cooked, copying and suggestions
 
 - In a cook meal's dialog, **Cooked** adds it to the recipe's cook log.
-- **Copy last week** copies a whole week. Dates move, and the cooked ticks reset.
+- **Copy the 7 days before** copies the previous 7 days onto the days shown. Dates move, and the cooked ticks reset.
 - **Suggest meals** fills empty dinners. It prefers favourites, high ratings and recipes you haven't cooked lately, and it cooks double when tomorrow's lunch is free. You see a preview first, and nothing is saved until you accept it.
 
-### Starting the week on another day
+### Removing a meal
 
-If you shop and cook at the weekend, set **The week starts on** to Saturday in Settings. The plan and shopping list then run Saturday to Friday, and no meals are lost when you switch.
-
-![Week starting Saturday](screenshots/desktop-plan-saturday.png)
+Removing a cook meal (or a make-ahead) also removes the leftovers meals planned from it, on any later day.
 
 ## 9. Leftovers, freezing and make-ahead cooking
 
@@ -259,7 +257,8 @@ Make-ahead food goes on the shopping list but isn't counted in that day's calori
 
 ![Shopping list](screenshots/desktop-shopping.png)
 
-- **Update from the plan** builds the list from every meal you'll **cook** this week, scaled to the people eating. Leftover meals don't add anything, because that food is already cooked.
+- The list covers 7 days, like the plan. **Shop** opens the list you're working through (one built in the last few days that still covers today), otherwise today's 7 days; the arrows move 7 days at a time.
+- **Update from the plan** builds the list from every meal you'll **cook** on those days, scaled to the people eating. Leftover meals don't add anything, because that food is already cooked.
 - The same ingredient from different recipes is **combined** (garlic cloves from two recipes become one line), and compatible units are merged (tbsp + ml, g + kg).
 - Under each item you can see which recipes need it.
 - **Tick items** in the shop on your phone.
@@ -274,7 +273,7 @@ Make-ahead food goes on the shopping list but isn't counted in that day's calori
 - **People by default** and **Calorie target per person per day**
 - **Meals in a day**: breakfast, lunch and dinner by default. You can add *snack* or *dessert*.
 - **Fridge life to assume when a recipe doesn't say** (days)
-- **The week starts on**: any day
+- **The week starts on**: how the plan is grouped into weekly files on disk (and for the MCP tools). The plan page always starts today.
 - **Local AI**: the status of the Ollama connection, the **Ollama address** (the computer Ollama runs on — type an IP address like `192.168.0.10` or a name; leave it empty to use the one from `.env`), and which model reads photos, which tidies text, and which works out nutrition. You can also use **LightOnOCR + a text model** instead of a vision model, or turn AI nutrition off.
 - **Your data**: where the files are, and whether version history is on.
 

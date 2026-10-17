@@ -70,7 +70,7 @@ test("plan a meal, change how many people, mark it cooked, see it in the cook lo
   await page.goto("/recipes/spaghetti-bolognese");
   await page.getByRole("button", { name: "Add to plan" }).click();
   await page.getByRole("dialog").getByRole("button", { name: /^Add to / }).click();
-  await expect(page).toHaveURL(/\/plan\/\d{4}-W\d{2}$/);
+  await expect(page).toHaveURL(/\/plan$/); // added for today: the plan opens on today
   const today = page.locator(".day.today");
   await expect(today.locator(".meal-btn", { hasText: "Spaghetti Bolognese" })).toBeVisible();
 
@@ -126,7 +126,7 @@ test("cook extra, then eat the leftovers on another day", async ({ page }) => {
 test("shopping list: build from the plan, tick, untick, add your own item", async ({ page }) => {
   await page.goto("/shopping");
   await page.getByRole("button", { name: /from the plan/ }).click();
-  await expect(page.getByText("Updated from this week's plan")).toBeVisible(); // wait for the new list before reading it
+  await expect(page.getByText("Updated from the plan")).toBeVisible(); // wait for the new list before reading it
   const first = page.locator(".shop-item").first();
   const text = await first.locator(".txt").innerText();
   await first.click();
@@ -134,7 +134,7 @@ test("shopping list: build from the plan, tick, untick, add your own item", asyn
   await page.reload();
   await expect(page.locator(".shop-item.done .txt")).toHaveText(text);
   await page.getByRole("button", { name: /from the plan/ }).click(); // ticks survive an update
-  await expect(page.getByText("Updated from this week's plan")).toBeVisible();
+  await expect(page.getByText("Updated from the plan")).toBeVisible();
   await expect(page.locator(".shop-item.done .txt")).toHaveText(text);
 
   await page.getByPlaceholder(/Add something else/).fill("Bin bags");

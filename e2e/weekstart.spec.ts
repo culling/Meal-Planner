@@ -1,5 +1,5 @@
 import type { APIRequestContext, Page } from "@playwright/test";
-import { expect, isPhone, shot, test } from "./helpers";
+import { expect, isPhone, test } from "./helpers";
 
 // Plan layout (days across, meals down) and choosing which day the week starts on (e.g. Saturday).
 // The start day is put back to Monday afterwards so nothing else is affected.
@@ -53,6 +53,7 @@ test("wide screens: one column per day, one row per meal", async ({ page }) => {
 test("phones keep readable day cards (a seven-column table would be too narrow)", async ({ page }) => {
   test.skip(!isPhone(), "phone layout");
   await page.goto("/plan");
+  await expect(page.locator(".day-head")).toHaveCount(7); // the plan has loaded
   const heads = await Promise.all((await page.locator(".day-head").all()).map(box));
   for (let i = 1; i < 7; i++) {
     expect(heads[i].y).toBeGreaterThan(heads[i - 1].y + 100); // stacked down the page
@@ -62,7 +63,7 @@ test("phones keep readable day cards (a seven-column table would be too narrow)"
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test("choose Saturday as the first day: the plan regroups, nothing is lost, and it can be undone", async ({ page, request }) => {
+test("choose Saturday as the first day: the files regroup, nothing is lost, the plan still starts today, and it can be undone", async ({ page, request }) => {
   test.skip(isPhone(), "changed once, on the desktop project");
   const before = await allMeals(request);
   expect(before.length).toBeGreaterThan(5); // the earlier tests left meals in several weeks
@@ -74,22 +75,16 @@ test("choose Saturday as the first day: the plan regroups, nothing is lost, and 
   await page.getByRole("dialog").getByRole("button", { name: "Change it" }).click();
   await expect(page.getByText("Settings saved")).toBeVisible();
 
+  // the plan page shows 7 days from today whatever the week start is
   await page.goto("/plan");
-  await expect(page.locator(".day-head").first()).toContainText(/^Sat/);
-  await expect(page.locator(".day-head").last()).toContainText(/^Fri/);
-  await expect(page.locator(".day.today")).toHaveCount(1); // today is inside the week that is shown
-  const title = await page.locator(".week-nav .title small").innerText();
-  expect(title).toMatch(/\d/);
-  await shot(page, "plan-saturday");
+  await expect(page.locator(".day").first()).toHaveClass(/today/);
+  await expect(page.locator(".day-head")).toHaveCount(7);
+  expect(await page.locator(".week-nav .title small").innerText()).toMatch(/\d/);
 
   // the same meals on the same dates, just filed under different weeks
   expect(await allMeals(request)).toEqual(before);
-
-  // the next week starts a week later, on a Saturday again
-  const firstDay = (await page.locator(".day-head .name").first().innerText()).trim();
-  await page.getByRole("button", { name: "Next week" }).click();
-  await expect(page.locator(".day-head").first()).toContainText(/^Sat/);
-  expect((await page.locator(".day-head .name").first().innerText()).trim()).not.toBe(firstDay);
+  const files: string[] = (await (await request.get("/api/meal-plans")).json()).weeks;
+  for (const w of files) expect(new Date(`${(await (await request.get(`/api/meal-plans/${w}`)).json()).startDate}T12:00:00`).getDay(), w).toBe(6); // Saturdays
 
   // the shopping list follows the same week
   await page.goto("/shopping");
@@ -102,7 +97,7 @@ test("choose Saturday as the first day: the plan regroups, nothing is lost, and 
   await page.getByRole("dialog").getByRole("button", { name: "Change it" }).click();
   await expect(page.getByText("Settings saved")).toBeVisible();
   await page.goto("/plan");
-  await expect(page.locator(".day-head").first()).toContainText(/^Mon/);
+  await expect(page.locator(".day").first()).toHaveClass(/today/);
   expect(await allMeals(request)).toEqual(before);
 });
 
