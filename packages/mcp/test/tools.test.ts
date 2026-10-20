@@ -45,10 +45,10 @@ describe("MCP tools (through core, temp data folder)", () => {
     expect((await call("get_meal_plan", { week: "2026-W42" })).data.days[0].meals.dinner.peopleFrom).toBe("meal");
     await call("set_people", { week: "2026-W42", date: "2026-10-12", slot: "dinner", value: null });
     expect((await call("list_available_leftovers", { date: "2026-10-14" })).data).toHaveLength(0); // 3 extra, 3 used
-    await call("mark_meal_cooked", { date: "2026-10-12", slot: "dinner", rating: 5 });
-    expect((await call("get_recipe", { slug: "butter-chicken" })).data.cookLog[0]).toMatchObject({ date: "2026-10-12", people: 3, rating: 5 });
     const list = await call("generate_shopping_list", { week: "2026-W42" });
     expect(list.data.some((i: any) => /chicken/.test(i.item))).toBe(true);
+    await call("mark_meal_cooked", { date: "2026-10-12", slot: "dinner", rating: 5 });
+    expect((await call("get_recipe", { slug: "butter-chicken" })).data.cookLog[0]).toMatchObject({ date: "2026-10-12", people: 3, rating: 5 });
     expect((await call("suggest_meal_plan", { week: "2026-W50" })).summary).toMatch(/suggestion/);
     await call("update_settings", { patch: { defaultPeople: 5 } });
     expect((await call("get_settings")).data.defaultPeople).toBe(5);

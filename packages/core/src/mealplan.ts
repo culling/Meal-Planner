@@ -304,9 +304,11 @@ export function shiftDays(days: DayPlan[], shift: number): DayPlan[] {
 // ---------- shopping list ----------
 
 const FILLER = /^(large|small|medium|fresh|ripe|whole|extra|good quality|good|big|baby|boneless|skinless)\s+/;
+// recipe sites mark notes with "chipotle powder³" or "chipotle in adobo*"
+const FOOTNOTE = /[*†‡¹²³⁰⁴-⁹]+/g;
 
 export function normaliseIngredientName(name: string): string {
-  let n = name.toLowerCase().replace(/\(.*?\)/g, "").replace(/\s+/g, " ").trim();
+  let n = name.toLowerCase().replace(/\(.*?\)/g, "").replace(FOOTNOTE, "").replace(/\s+/g, " ").trim();
   for (let i = 0; i < 3; i++) n = n.replace(FILLER, "");
   n = n
     .replace(/ies$/, "y")
@@ -330,10 +332,11 @@ export function aggregateShopping(
   for (const { recipe, title, scale } of meals) {
     for (const ing of recipe.ingredients) {
       if (ing.optional) continue;
-      const norm = normaliseIngredientName(ing.name);
-      if (!norm) continue;
-      const line = lines.get(norm) ?? { key: norm.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""), name: ing.name, parts: new Map(), noQuantity: false, from: new Set<string>() };
-      lines.set(norm, line);
+      const key = normaliseIngredientName(ing.name).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      if (!key) continue;
+      // one line per key: names that differ only in punctuation must not become two items with the same key
+      const line = lines.get(key) ?? { key, name: ing.name.replace(FOOTNOTE, "").trim(), parts: new Map(), noQuantity: false, from: new Set<string>() };
+      lines.set(key, line);
       line.from.add(title);
       if (ing.quantity === null) {
         line.noQuantity = true;

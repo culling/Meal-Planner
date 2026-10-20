@@ -66,4 +66,25 @@ describe("windows", () => {
     expect((await ctx.store.getShoppingList(SAT)).items).toHaveLength(2);
     expect(await ctx.store.listShoppingLists()).toEqual([SAT]);
   });
+
+  it("shop for only the meals ticked, leaving out cooked ones", async () => {
+    await planner.setMeal(SAT, "2026-10-17", "dinner", { recipe: "curry", type: "cook" });
+    await planner.setMeal(SAT, "2026-10-18", "dinner", { recipe: "pasta", type: "cook" });
+    let list = await planner.generateShopping(SAT);
+    expect(list.meals.map((m) => [m.key, m.included])).toEqual([
+      ["2026-10-17/dinner", true],
+      ["2026-10-18/dinner", true],
+    ]);
+    list = await planner.generateShopping(SAT, ["2026-10-17/dinner"]);
+    expect(list.items.map((i) => i.text)).toEqual(["200 g spaghetti"]);
+    // the choice is kept when the list is rebuilt or ticked
+    list = await planner.saveShoppingItems(SAT, list.items.map((i) => ({ ...i, checked: true })));
+    expect(list.skip).toEqual(["2026-10-17/dinner"]);
+    list = await planner.generateShopping(SAT);
+    expect(list.items.map((i) => i.text)).toEqual(["200 g spaghetti"]);
+    await planner.setMeal(SAT, "2026-10-18", "dinner", { recipe: "pasta", type: "cook", cooked: true });
+    list = await planner.generateShopping(SAT);
+    expect(list.items).toEqual([]);
+    expect(list.meals.find((m) => m.key === "2026-10-18/dinner")).toMatchObject({ cooked: true, included: false });
+  });
 });

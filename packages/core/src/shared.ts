@@ -5,4 +5,4 @@ export * from "./mealplan";
 export { parseIngredient, formatIngredient, formatQuantity, parseIngredientSection } from "./ingredients";
 export { dayLabel, dateRangeLabel } from "./render";
 export type { RecipeFilters } from "./search";
-export type { PlanView, DayView, MealView } from "./planner";
+export type { PlanView, DayView, MealView, ShoppingView } from "./planner";

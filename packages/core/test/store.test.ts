@@ -169,7 +169,7 @@ describe("settings, foods, plans", () => {
     expect(again.defaultPeople).toBe(3);
   });
   it("honours ticks made in a text editor on shopping lists", async () => {
-    await ctx.store.saveShoppingList({ week: "2026-W42", generatedAt: null, items: [{ key: "milk", text: "1 l milk", checked: false, manual: false, from: ["X"] }] });
+    await ctx.store.saveShoppingList({ week: "2026-W42", generatedAt: null, skip: [], items: [{ key: "milk", text: "1 l milk", checked: false, manual: false, from: ["X"] }] });
     const file = path.join(ctx.dir, "shopping-lists", "2026-W42.md");
     await fs.writeFile(file, (await fs.readFile(file, "utf8")).replace("- [ ]", "- [x]"));
     expect((await ctx.store.getShoppingList("2026-W42")).items[0].checked).toBe(true);

@@ -155,13 +155,18 @@ describe("meal plans API", () => {
   });
 
   it("marks cooked, builds the shopping list, copies and suggests", async () => {
-    const cooked = await j("POST", "/api/meal-plans/2026-W42/days/2026-10-12/meals/dinner/cooked", { rating: 5 });
-    expect(cooked.body.days[0].meals.dinner.meal.cooked).toBe(true);
     const list = await j("POST", "/api/meal-plans/2026-W42/shopping-list");
     expect(list.body.items.length).toBeGreaterThan(0);
     const toggled = await j("PUT", "/api/meal-plans/2026-W42/shopping-list", { items: [...list.body.items.map((i: any, n: number) => (n === 0 ? { ...i, checked: true } : i)), { key: "bin-bags", text: "bin bags", checked: false, manual: true, from: [] }] });
     expect(toggled.body.items[0].checked).toBe(true);
     expect((await j("POST", "/api/meal-plans/2026-W42/shopping-list")).body.items.some((i: any) => i.key === "bin-bags")).toBe(true);
+    const skipped = await j("POST", "/api/meal-plans/2026-W42/shopping-list", { skip: ["2026-10-12/dinner"] });
+    expect(skipped.body.meals[0]).toMatchObject({ key: "2026-10-12/dinner", included: false });
+    expect(skipped.body.items.map((i: any) => i.key)).toEqual(["bin-bags"]);
+    expect((await j("POST", "/api/meal-plans/2026-W42/shopping-list", { skip: [] })).body.items.length).toBeGreaterThan(1);
+    const cooked = await j("POST", "/api/meal-plans/2026-W42/days/2026-10-12/meals/dinner/cooked", { rating: 5 });
+    expect(cooked.body.days[0].meals.dinner.meal.cooked).toBe(true);
+    expect((await j("GET", "/api/meal-plans/2026-W42/shopping-list")).body.meals[0]).toMatchObject({ cooked: true, included: false });
 
     expect((await j("POST", "/api/meal-plans/2026-W43/copy-from", { from: "2026-W42" })).body.days[0].meals.dinner.meal.cooked).toBe(false);
     expect((await j("POST", "/api/meal-plans/2026-W43/copy-from", { from: "2026-W42" })).status).toBe(400); // already has meals

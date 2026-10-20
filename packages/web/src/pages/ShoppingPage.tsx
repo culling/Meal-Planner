@@ -1,4 +1,4 @@
-import { addDays, dateRangeLabel, isValidYmd, isoWeekOf, shiftWeek, todayYmd, type ShoppingItem } from "@mp/core/shared";
+import { addDays, dateRangeLabel, dayLabel, isValidYmd, isoWeekOf, shiftWeek, todayYmd, type ShoppingItem } from "@mp/core/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -41,17 +41,21 @@ function ShoppingList({ week }: { week: string }) {
     }
   };
   const toggle = (key: string) => save(items.map((i) => (i.key === key ? { ...i, checked: !i.checked } : i)));
-  const regenerate = async () => {
+  const regenerate = async (skip?: string[]) => {
     setBusy(true);
     try {
-      qc.setQueryData(["shopping", week], await api.post(`/api/meal-plans/${week}/shopping-list`));
+      qc.setQueryData(["shopping", week], await api.post(`/api/meal-plans/${week}/shopping-list`, skip ? { skip } : {}));
       void qc.invalidateQueries({ queryKey: ["shopping", "lists"] });
-      toast("Updated from the plan");
+      if (!skip) toast("Updated from the plan");
     } catch (e) {
       toast(errMsg(e), "bad");
     } finally {
       setBusy(false);
     }
+  };
+  const toggleMeal = (key: string) => {
+    const skip = list.meals.filter((m) => !m.cooked && !m.included).map((m) => m.key);
+    void regenerate(skip.includes(key) ? skip.filter((k) => k !== key) : [...skip, key]);
   };
   const addManual = () => {
     const t = text.trim();
@@ -106,7 +110,7 @@ function ShoppingList({ week }: { week: string }) {
       </div>
 
       <div className="row wrap">
-        <button className="btn primary" disabled={busy} onClick={regenerate}>
+        <button className="btn primary" disabled={busy} onClick={() => regenerate()}>
           <Refresh /> {items.some((i) => !i.manual) ? "Update from the plan" : "Build from the plan"}
         </button>
         <Link className="btn" to={`/plan/${week}`}>
@@ -121,6 +125,38 @@ function ShoppingList({ week }: { week: string }) {
       <p className="small muted" style={{ margin: 0 }}>
         Built from the meals you'll cook on these days, scaled for the number of people. Ticks and your own items are kept when you update it.
       </p>
+
+      {list.meals.length > 0 && (
+        <div className="card">
+          <div className="small muted" style={{ marginBottom: 4 }}>
+            Shop for these meals — untick any you've already bought for
+          </div>
+          {list.meals.map((m) => (
+            <div
+              key={m.key}
+              className={`pick ${m.included ? "on" : ""}`}
+              role="checkbox"
+              aria-checked={m.included}
+              aria-disabled={m.cooked || busy}
+              tabIndex={m.cooked ? -1 : 0}
+              style={m.cooked ? { cursor: "default" } : undefined}
+              onClick={() => !m.cooked && !busy && toggleMeal(m.key)}
+              onKeyDown={(e) => (e.key === " " || e.key === "Enter") && (e.preventDefault(), !m.cooked && !busy && toggleMeal(m.key))}
+            >
+              <CheckBox on={m.included} />
+              <div className="grow">
+                <div className="txt" style={{ fontWeight: 600 }}>
+                  {m.title}
+                </div>
+                <div className="tiny muted">
+                  {dayLabel(m.date)} · {m.slot}
+                  {m.cooked && " · already cooked"}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="row">
         <input className="input" placeholder="Add something else (bin bags, milk…)" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addManual()} />

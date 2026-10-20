@@ -179,6 +179,16 @@ describe("shopping list", () => {
     expect(text).toContain("2 onions");
     expect(text.some((t) => /salt/i.test(t))).toBe(false);
   });
+  it("never makes two items with the same key (footnote marks, punctuation)", () => {
+    const a = recipe("a", {}, "- 1 tsp chipotle powder\n- 2 tbsp chipotle in adobo*");
+    const b = recipe("b", {}, "- 2 tsp chipotle powder³\n- 1 tbsp chipotle in adobo");
+    const items = aggregateShopping([
+      { recipe: a, title: "A", scale: 1 },
+      { recipe: b, title: "B", scale: 1 },
+    ]);
+    expect(new Set(items.map((i) => i.key)).size).toBe(items.length);
+    expect(items.map((i) => i.text)).toEqual(["3 tbsp chipotle in adobo", "3 tsp chipotle powder"]);
+  });
   it("keeps ticks and manual items when regenerated", () => {
     const merged = mergeShopping(
       [

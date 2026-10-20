@@ -345,11 +345,13 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 }
 
 /* ---------- shopping ---------- */
-.shop-item { display: flex; gap: 14px; align-items: center; padding: 12px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
-.shop-item .box { width: 26px; height: 26px; border-radius: 8px; border: 2px solid var(--line); flex: none; display: flex; align-items: center; justify-content: center; color: #fff; }
+.shop-item, .pick { display: flex; gap: 14px; align-items: center; padding: 12px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.shop-item .box, .pick .box { width: 26px; height: 26px; border-radius: 8px; border: 2px solid var(--line); flex: none; display: flex; align-items: center; justify-content: center; color: #fff; }
 .shop-item.done .box { background: var(--green); border-color: var(--green); }
 .shop-item.done .txt { text-decoration: line-through; color: var(--ink-soft); }
-.shop-item .box svg { width: 16px; height: 16px; }
+.shop-item .box svg, .pick .box svg { width: 16px; height: 16px; }
+.pick.on .box { background: var(--green); border-color: var(--green); }
+.pick:not(.on) .txt { color: var(--ink-soft); }
 
 /* ---------- review ---------- */
 .lowconf { outline: 2px solid var(--amber); outline-offset: 1px; border-radius: 12px; }

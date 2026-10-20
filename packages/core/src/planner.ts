@@ -21,7 +21,7 @@ import {
   type PlanWarning,
 } from "./mealplan";
 import { applyCopy, type CopyMode, type CopyResult, type SlotRef } from "./copymeals";
-import { MealSchema, type DayPlan, type Meal, type MealPlan, type ShoppingList } from "./schemas";
+import { MealSchema, type DayPlan, type Meal, type MealPlan, type ShoppingItem, type ShoppingList } from "./schemas";
 import type { DataStore } from "./store";
 
 export interface MealView {
@@ -498,29 +498,78 @@ export class Planner {
 
   // ---------- shopping ----------
 
-  /** Build the shopping list for a week or a 7-day window, saved under that id. */
-  async generateShopping(at: string): Promise<ShoppingList & { mtimeMs: number | null }> {
+  /** The meals a shopping list covers: every cook meal in its days, and whether it's on the list. */
+  private async shoppingMeals(at: string, skip: string[]) {
     const settings = this.store.getSettings();
     const { plans, days } = await this.daysOf(at);
-    const meals: Parameters<typeof aggregateShopping>[0] = [];
+    const meals: ShoppingMeal[] = [];
     for (const day of days) {
       const plan = plans.find((p) => p.days.includes(day))!;
-      for (const meal of Object.values(day.meals)) {
+      for (const [slot, meal] of Object.entries(day.meals)) {
         if (!meal || meal.type !== "cook" || !meal.recipe) continue;
         const recipe = this.store.getRecipe(meal.recipe);
         if (!recipe) continue;
+        const key = mealKey(day.date, slot);
         const people = resolvePeople(meal, day, plan, settings).value;
-        meals.push({ recipe, title: recipe.meta.title, scale: cookScale(recipe, meal, people) });
+        meals.push({
+          key,
+          date: day.date,
+          slot,
+          recipe: meal.recipe,
+          title: recipe.meta.title,
+          cooked: meal.cooked,
+          // a meal already cooked needs nothing bought
+          included: !meal.cooked && !skip.includes(key),
+          scale: cookScale(recipe, meal, people),
+        });
       }
     }
+    return meals;
+  }
+
+  /** A saved shopping list, with the meals it can be built from. */
+  async getShopping(at: string): Promise<ShoppingView> {
+    const list = await this.store.getShoppingList(at);
+    const meals = await this.shoppingMeals(at, list.skip);
+    return { ...list, meals: meals.map(({ scale: _, ...m }) => m) };
+  }
+
+  /** Build the shopping list for a week or a 7-day window, saved under that id. Pass `skip` to change which meals it's for. */
+  async generateShopping(at: string, skip?: string[]): Promise<ShoppingView> {
     const existing = await this.store.getShoppingList(at);
-    const fresh = aggregateShopping(meals);
-    return this.store.saveShoppingList({
+    const left = skip ?? existing.skip;
+    const meals = await this.shoppingMeals(at, left);
+    const fresh = aggregateShopping(
+      meals.filter((m) => m.included).map((m) => ({ recipe: this.store.getRecipe(m.recipe)!, title: m.title, scale: m.scale })),
+    );
+    await this.store.saveShoppingList({
       week: at,
       generatedAt: new Date().toISOString(),
+      skip: left,
       items: mergeShopping(existing.items, fresh),
     });
+    return this.getShopping(at);
+  }
+
+  /** Save ticks and hand-added items, keeping which meals the list is for. */
+  async saveShoppingItems(at: string, items: ShoppingItem[]): Promise<ShoppingView> {
+    const current = await this.store.getShoppingList(at);
+    await this.store.saveShoppingList({ week: at, generatedAt: current.generatedAt, skip: current.skip, items });
+    return this.getShopping(at);
   }
 }
+
+export interface ShoppingMeal {
+  key: string;
+  date: string;
+  slot: string;
+  recipe: string;
+  title: string;
+  cooked: boolean;
+  included: boolean;
+  scale: number;
+}
+
+export type ShoppingView = ShoppingList & { mtimeMs: number | null; meals: Omit<ShoppingMeal, "scale">[] };
 
 export { mealKey };

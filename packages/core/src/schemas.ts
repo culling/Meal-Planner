@@ -375,6 +375,8 @@ export const ShoppingListSchema = z
   .object({
     week: z.string(),
     generatedAt: z.string().nullable().default(null),
+    /** "YYYY-MM-DD/slot" of the meals left out of the list (already bought for, not cooking it…) */
+    skip: z.array(z.string()).default([]),
     items: z.array(ShoppingItemSchema).default([]),
   })
   .passthrough();

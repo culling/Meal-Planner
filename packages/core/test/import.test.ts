@@ -211,6 +211,15 @@ describe("importer and the whole flow", () => {
     expect((await planner.availableLeftovers("2026-10-14"))[0]).toMatchObject({ remaining: 2, safeUntil: "2026-10-15" });
     expect(await planner.availableLeftovers("2026-10-20")).toEqual([]);
 
+    const list = await planner.generateShopping("2026-W42");
+    expect(list.items.length).toBeGreaterThan(5);
+    const rice = list.items.find((i) => /rice/i.test(i.text));
+    expect(rice?.from).toEqual(["Chicken Fried Rice"]);
+    const tick = { ...list, items: list.items.map((i, n) => (n === 0 ? { ...i, checked: true } : i)) };
+    await planner.saveShoppingItems("2026-W42", tick.items);
+    const regenerated = await planner.generateShopping("2026-W42");
+    expect(regenerated.items.find((i) => i.key === list.items[0].key)?.checked).toBe(true);
+
     view = await planner.markCooked("2026-W42", "2026-10-12", "dinner", { rating: 5 });
     expect(view.days[0].meals.dinner!.meal.cooked).toBe(true);
     const after = ctx.store.getRecipe(recipe.slug)!;
@@ -221,13 +230,7 @@ describe("importer and the whole flow", () => {
     await planner.markCooked("2026-W42", "2026-10-12", "dinner");
     expect(ctx.store.getRecipe(recipe.slug)!.cookLog).toHaveLength(1);
 
-    const list = await planner.generateShopping("2026-W42");
-    expect(list.items.length).toBeGreaterThan(5);
-    const rice = list.items.find((i) => /rice/i.test(i.text));
-    expect(rice?.from).toEqual(["Chicken Fried Rice"]);
-    const tick = { ...list, items: list.items.map((i, n) => (n === 0 ? { ...i, checked: true } : i)) };
-    await ctx.store.saveShoppingList(tick);
-    const regenerated = await planner.generateShopping("2026-W42");
-    expect(regenerated.items.find((i) => i.key === list.items[0].key)?.checked).toBe(true);
+    // once cooked, nothing more needs buying for it
+    expect((await planner.generateShopping("2026-W42")).items).toEqual([]);
   });
 });

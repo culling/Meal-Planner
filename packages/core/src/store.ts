@@ -836,6 +836,14 @@ export class DataStore extends EventEmitter {
     const ticks = new Map<string, boolean>();
     for (const m of doc.body.matchAll(/^- \[([ xX])\] .*?<!--(.+?)-->\s*$/gm)) ticks.set(m[2], m[1] !== " ");
     list.items = list.items.map((i) => (ticks.has(i.key) ? { ...i, checked: ticks.get(i.key)! } : i));
+    // older lists could hold two items with one key; keep both, but give the later one its own key
+    const seen = new Set<string>();
+    list.items = list.items.map((i) => {
+      let key = i.key;
+      for (let n = 2; seen.has(key); n++) key = `${i.key}-${n}`;
+      seen.add(key);
+      return key === i.key ? i : { ...i, key };
+    });
     return { ...list, mtimeMs: r.mtimeMs };
   }
 

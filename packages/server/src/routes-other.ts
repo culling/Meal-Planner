@@ -141,14 +141,15 @@ export function registerOtherRoutes(server: FastifyInstance, app: App) {
 
   // ---------- shopping list ----------
   server.get("/api/shopping-lists", async () => ({ lists: await store.listShoppingLists() }));
-  server.get<{ Params: { week: string } }>("/api/meal-plans/:week/shopping-list", async (req) => store.getShoppingList(week(req.params.week)));
-  server.post<{ Params: { week: string } }>("/api/meal-plans/:week/shopping-list", async (req) => planner.generateShopping(week(req.params.week)));
+  server.get<{ Params: { week: string } }>("/api/meal-plans/:week/shopping-list", async (req) => planner.getShopping(week(req.params.week)));
+  server.post<{ Params: { week: string } }>("/api/meal-plans/:week/shopping-list", async (req) => {
+    const { skip } = z.object({ skip: z.array(z.string()).optional() }).parse(req.body ?? {});
+    return planner.generateShopping(week(req.params.week), skip);
+  });
   server.put<{ Params: { week: string } }>("/api/meal-plans/:week/shopping-list", async (req) => {
     const { items } = z.object({ items: z.array(ShoppingItemSchema) }).parse(req.body);
-    const current = await store.getShoppingList(week(req.params.week));
-    return store.saveShoppingList({ week: req.params.week, generatedAt: current.generatedAt, items });
+    return planner.saveShoppingItems(week(req.params.week), items);
   });
-
   // ---------- settings ----------
   server.get("/api/settings", async () => store.getSettings());
   server.put("/api/settings", async (req) => store.updateSettings(req.body ?? {}));

@@ -11,7 +11,7 @@ import type {
   RecipeFilters,
   RecipeMeta,
   Settings,
-  ShoppingList,
+  ShoppingView,
 } from "@mp/core/shared";
 
 export class ApiError extends Error {
@@ -203,7 +203,7 @@ export const useRecipes = (filters: RecipeFilters) =>
 export const useRecipe = (slug: string | undefined) => useQuery({ queryKey: ["recipe", slug], queryFn: () => api.get<RecipeFull>(`/api/recipes/${slug}`), enabled: !!slug });
 export const useFacets = () => useQuery({ queryKey: ["facets"], queryFn: () => api.get<Facets>("/api/facets") });
 export const usePlan = (week: string) => useQuery({ queryKey: ["plan", week], queryFn: () => api.get<PlanView>(`/api/meal-plans/${week}`) });
-export const useShopping = (week: string) => useQuery({ queryKey: ["shopping", week], queryFn: () => api.get<ShoppingList & { mtimeMs: number | null }>(`/api/meal-plans/${week}/shopping-list`) });
+export const useShopping = (week: string) => useQuery({ queryKey: ["shopping", week], queryFn: () => api.get<ShoppingView>(`/api/meal-plans/${week}/shopping-list`) });
 export const useFoods = () => useQuery({ queryKey: ["foods"], queryFn: () => api.get<{ foods: FoodRow[] }>("/api/foods") });
 export const useSettings = () => useQuery({ queryKey: ["settings"], queryFn: () => api.get<Settings>("/api/settings"), staleTime: 60_000 });
 export const useStatus = () => useQuery({ queryKey: ["status"], queryFn: () => api.get<Status>("/api/status"), staleTime: 10_000 });
