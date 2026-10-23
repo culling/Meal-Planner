@@ -1,6 +1,6 @@
 // Copy, extend and move meals around a week's plan. Pure functions on plans (no file access) so they are easy to test.
 import { addDays } from "./dates";
-import { baseSlot, extraSlotBase, freePrepSlot, isPrepSlot, mealKey, resolvePeople, splitMealKey } from "./mealplan";
+import { baseSlot, evenPortions, extraSlotBase, freeExtraSlot, freePrepSlot, isPrepSlot, mealGroup, mealKey, resolvePeople, splitMealKey } from "./mealplan";
 import { MealSchema, type Meal, type MealPlan, type Settings } from "./schemas";
 import { ValidationError } from "./fsutil";
 
@@ -14,8 +14,9 @@ export interface SlotRef {
  * leftovers = eat the first meal's leftovers there (cooking extra portions as needed)
  * move     = take the meal out of its slot and put it in the target slot
  * auto     = leftovers when every target is still inside the food's fridge life, otherwise repeat
+ * join     = add it to the meal in the target slot, as a dish served with it (moved, or copied with `keep`)
  */
-export type CopyMode = "auto" | "repeat" | "leftovers" | "move";
+export type CopyMode = "auto" | "repeat" | "leftovers" | "move" | "join";
 
 export interface CopyResult {
   mode: Exclude<CopyMode, "auto">;
@@ -72,10 +73,61 @@ export interface CopyRequest {
   from: SlotRef;
   to: SlotRef[];
   mode?: CopyMode;
+  /** join: add a copy and leave the original where it is (Ctrl+drag) */
+  keep?: boolean;
+}
+
+/**
+ * Put a meal's dishes at `to`: the first in that slot, the rest beside it (dinner-2…) joined to it. Whatever meal was in
+ * the slot is replaced, with every dish of it. Returns where each dish went.
+ */
+function placeMeal(plans: PlanLike[], to: SlotRef, dishes: Meal[]): SlotRef[] {
+  const day = dayOf(plans, to.date);
+  if (!day) throw new ValidationError(`${to.date} isn't in the weeks being edited`);
+  const slot = dishes.length > 1 ? baseSlot(to.slot) : to.slot;
+  const old = !day.meals[slot] ? [] : extraSlotBase(slot) ? [slot] : mealGroup(day, slot);
+  for (const s of old) delete day.meals[s];
+  day.meals[slot] = { ...dishes[0], joined: false };
+  const placed = [{ date: to.date, slot }];
+  for (const d of dishes.slice(1)) {
+    const extra = freeExtraSlot(day, baseSlot(slot));
+    day.meals[extra] = { ...d, joined: true };
+    placed.push({ date: to.date, slot: extra });
+  }
+  return placed;
+}
+
+/** Meals that ate the leftovers of the cook at `oldKey` follow it to `newKey`. */
+function repoint(plans: PlanLike[], oldKey: string, newKey: string) {
+  for (const p of plans) for (const d of p.days) for (const m of Object.values(d.meals)) if (m?.leftoverFrom === oldKey) m.leftoverFrom = newKey;
+}
+
+/**
+ * Make sure each of these cook meals makes enough for everyone eating it (and the other dishes of its meal as many),
+ * returning the first one that had to cook more.
+ */
+function cookEnough(plans: PlanLike[], cookKeys: string[], settings: Pick<Settings, "defaultPeople">): CopyResult["cookMore"] {
+  let first: CopyResult["cookMore"] = null;
+  for (const cookKey of cookKeys) {
+    const cookRef = splitMealKey(cookKey)!;
+    const cookPlan = plans.find((p) => p.days.some((d) => d.date === cookRef.date));
+    const cook = cookPlan ? mealAt([cookPlan], cookRef) : null;
+    if (!cook || !cookPlan || cook.type !== "cook") continue;
+    const day = cookPlan.days.find((d) => d.date === cookRef.date)!;
+    const needed = portionsNeeded(plans, cookKey, settings);
+    const current = cook.portions ?? resolvePeople(cook, day, cookPlan, settings).value;
+    if (needed > current) {
+      cook.portions = needed;
+      first ??= { key: cookKey, recipe: cook.recipe, portions: needed };
+    }
+    evenPortions(day, cookRef.slot, cookPlan, settings);
+  }
+  return first;
 }
 
 /**
  * Apply a copy/fill/move to `plans` (previous, current and next week, in any order; the one containing `from` is edited).
+ * The first dish of a meal stands for the whole meal (its joined dishes go with it); a joined dish on its own goes alone.
  * Mutates the plans it is given. Throws ValidationError for impossible requests.
  */
 export function applyCopy(
@@ -83,9 +135,12 @@ export function applyCopy(
   req: CopyRequest,
   ctx: { slots: string[]; settings: Pick<Settings, "defaultPeople" | "defaultLeftoverFridgeDays">; fridgeDaysOf: (recipe: string | null) => number },
 ): CopyResult {
-  if (!dayOf(plans, req.from.date)) throw new ValidationError("That day isn't in the plan");
+  const srcDay = dayOf(plans, req.from.date);
+  if (!srcDay) throw new ValidationError("That day isn't in the plan");
   const src = mealAt(plans, req.from);
   if (!src) throw new ValidationError("There's no meal there to copy");
+  const group = extraSlotBase(req.from.slot) ? [req.from.slot] : mealGroup(srcDay, req.from.slot);
+  const dishes = group.map((s) => ({ slot: s, meal: srcDay.meals[s]! }));
 
   const order = (r: SlotRef) => `${r.date}|${String(ctx.slots.indexOf(baseSlot(r.slot))).padStart(3, "0")}`;
   const seen = new Set<string>([mealKey(req.from.date, req.from.slot)]);
@@ -103,17 +158,21 @@ export function applyCopy(
   }
   if (!targets.length) throw new ValidationError("Choose somewhere to put it");
 
+  if (req.mode === "join") return joinMeal(plans, req, targets, dishes, ctx.settings);
+
   // make-ahead cooking lives in its own row: only another day's make-ahead row can hold it, and only it can go there
   const srcIsPrep = isPrepSlot(req.from.slot);
   const prepTargets = targets.filter((t) => isPrepSlot(t.slot));
   if (!srcIsPrep && prepTargets.length) throw new ValidationError("Make-ahead cooking has its own row — add it there, then give the meals that will eat it");
   if (srcIsPrep && prepTargets.length && prepTargets.length !== targets.length) throw new ValidationError("Put make-ahead cooking either on other days' make-ahead rows or on meals that will eat it, not both");
 
-  const cookKey = src.type === "cook" ? mealKey(req.from.date, req.from.slot) : src.type === "leftovers" ? src.leftoverFrom : null;
+  const cookKeyOf = (slot: string, m: Meal) => (m.type === "cook" ? mealKey(req.from.date, slot) : m.type === "leftovers" ? m.leftoverFrom : null);
   let mode = req.mode ?? "auto";
   if (mode === "auto") {
-    // make-ahead food is always eaten as leftovers by the meals you choose; put on another day's make-ahead row it is cooked again
-    mode = srcIsPrep ? (prepTargets.length ? "repeat" : "leftovers") : resolveAutoMode(src, req.from, targets, ctx.fridgeDaysOf(src.recipe));
+    // make-ahead food is always eaten as leftovers by the meals you choose; put on another day's make-ahead row it is cooked again.
+    // A meal of several dishes keeps as long as its quickest-to-spoil dish.
+    const fridgeDays = Math.min(...dishes.map((d) => ctx.fridgeDaysOf(d.meal.recipe)));
+    mode = srcIsPrep ? (prepTargets.length ? "repeat" : "leftovers") : resolveAutoMode(src, req.from, targets, fridgeDays);
   }
   if (mode === "leftovers" && prepTargets.length) throw new ValidationError("Leftovers are eaten at meals, not in the make-ahead row");
   if (srcIsPrep && !prepTargets.length && mode !== "leftovers") throw new ValidationError("Make-ahead food is eaten as leftovers — choose the meals that will eat it");
@@ -132,65 +191,72 @@ export function applyCopy(
 
   if (mode === "move") {
     if (targets.length !== 1) throw new ValidationError("A meal can only be moved to one place");
-    const to = targets[0];
-    const moved = MealSchema.parse(structuredClone(src));
-    setMeal(plans, req.from, null);
-    setMeal(plans, to, moved);
-    if (src.type === "cook") {
-      // meals that eat this one's leftovers keep following it, in this week and the neighbours
-      const oldKey = mealKey(req.from.date, req.from.slot);
-      const newKey = mealKey(to.date, to.slot);
-      for (const p of plans) for (const d of p.days) for (const m of Object.values(d.meals)) if (m?.leftoverFrom === oldKey) m.leftoverFrom = newKey;
-    }
-    return { mode: "move", placed: [to], replaced, cookMore: null };
+    for (const d of dishes) setMeal(plans, { date: req.from.date, slot: d.slot }, null);
+    const placed = placeMeal(plans, targets[0], dishes.map((d) => MealSchema.parse(structuredClone(d.meal))));
+    // meals that eat this one's leftovers keep following it, in this week and the neighbours
+    dishes.forEach((d, i) => {
+      if (d.meal.type === "cook") repoint(plans, mealKey(req.from.date, d.slot), mealKey(placed[i].date, placed[i].slot));
+    });
+    return { mode: "move", placed: [placed[0]], replaced, cookMore: null };
   }
 
   if (mode === "leftovers") {
-    if (!cookKey) throw new ValidationError("Only a cooked meal (or its leftovers) can be turned into leftovers");
-    for (const t of targets) {
-      setMeal(
-        plans,
-        t,
-        MealSchema.parse({ type: "leftovers", recipe: src.recipe, leftoverFrom: cookKey, leftoverStore: "fridge", people: null, portions: null, cooked: false }),
-      );
-    }
+    const eaten = dishes.flatMap((d) => {
+      const key = cookKeyOf(d.slot, d.meal);
+      return key ? [{ recipe: d.meal.recipe, key }] : [];
+    });
+    if (!eaten.length) throw new ValidationError("Only a cooked meal (or its leftovers) can be turned into leftovers");
+    const placed = targets.map(
+      (t) =>
+        placeMeal(
+          plans,
+          t,
+          eaten.map((e) => MealSchema.parse({ type: "leftovers", recipe: e.recipe, leftoverFrom: e.key, leftoverStore: "fridge", people: null, portions: null, cooked: false })),
+        )[0],
+    );
     // make sure enough is cooked for everyone who will eat it
-    const cookRef = splitMealKey(cookKey)!;
-    const cookPlan = plans.find((p) => p.days.some((d) => d.date === cookRef.date));
-    const cook = cookPlan ? mealAt([cookPlan], cookRef) : null;
-    let cookMore: CopyResult["cookMore"] = null;
-    if (cook && cookPlan && cook.type === "cook") {
-      const needed = portionsNeeded(plans, cookKey, ctx.settings);
-      const day = cookPlan.days.find((d) => d.date === cookRef.date)!;
-      const current = cook.portions ?? resolvePeople(cook, day, cookPlan, ctx.settings).value;
-      if (needed > current) {
-        cook.portions = needed;
-        cookMore = { key: cookKey, recipe: cook.recipe, portions: needed };
-      }
-    }
-    return { mode: "leftovers", placed: targets, replaced, cookMore };
+    return { mode: "leftovers", placed, replaced, cookMore: cookEnough(plans, [...new Set(eaten.map((e) => e.key))], ctx.settings) };
   }
 
   // repeat: the same meal again
-  for (const t of targets) {
-    const copy = MealSchema.parse({ ...structuredClone(src), cooked: false, frozen: [] });
-    setMeal(plans, t, copy);
-  }
-  let cookMore: CopyResult["cookMore"] = null;
-  if (src.type === "leftovers" && cookKey) {
-    // another helping from the same batch: cook enough for it
-    const cookRef = splitMealKey(cookKey)!;
-    const cookPlan = plans.find((p) => p.days.some((d) => d.date === cookRef.date));
-    const cook = cookPlan ? mealAt([cookPlan], cookRef) : null;
-    if (cook && cookPlan && cook.type === "cook") {
-      const needed = portionsNeeded(plans, cookKey, ctx.settings);
-      const day = cookPlan.days.find((d) => d.date === cookRef.date)!;
-      const current = cook.portions ?? resolvePeople(cook, day, cookPlan, ctx.settings).value;
-      if (needed > current) {
-        cook.portions = needed;
-        cookMore = { key: cookKey, recipe: cook.recipe, portions: needed };
-      }
+  const placed = targets.map((t) => placeMeal(plans, t, dishes.map((d) => MealSchema.parse({ ...structuredClone(d.meal), cooked: false, frozen: [] })))[0]);
+  // another helping of leftovers from the same batch: cook enough for it
+  const batches = dishes.flatMap((d) => (d.meal.type === "leftovers" && d.meal.leftoverFrom ? [d.meal.leftoverFrom] : []));
+  return { mode: "repeat", placed, replaced, cookMore: cookEnough(plans, [...new Set(batches)], ctx.settings) };
+}
+
+/**
+ * Add a dish (or a whole meal's dishes) to the meal at the target, as dishes served with it: the rice dropped onto the
+ * salt and pepper tofu. They take the meal's people count, and every dish cooks as many portions as the most of them.
+ */
+function joinMeal(plans: PlanLike[], req: CopyRequest, targets: SlotRef[], dishes: { slot: string; meal: Meal }[], settings: Pick<Settings, "defaultPeople">): CopyResult {
+  if (targets.length !== 1) throw new ValidationError("A dish can only be added to one meal");
+  const to = targets[0];
+  if (isPrepSlot(req.from.slot) || isPrepSlot(to.slot)) throw new ValidationError("Make-ahead cooking can't be part of a meal");
+  const toPlan = plans.find((p) => p.days.some((d) => d.date === to.date))!;
+  const toDay = toPlan.days.find((d) => d.date === to.date)!;
+  const base = baseSlot(to.slot);
+  const head = toDay.meals[mealGroup(toDay, base)[0]];
+  if (!head) throw new ValidationError("There's no meal there to add it to");
+  if (head.type === "eat-out" || head.type === "skip") throw new ValidationError("Add dishes to a meal you're cooking or eating leftovers of");
+  const sameSlot = (slot: string) => req.from.date === to.date && baseSlot(slot) === base;
+  if (dishes.some((d) => d.slot === base && sameSlot(d.slot))) throw new ValidationError("That's already part of this meal");
+
+  for (const d of dishes) {
+    if (sameSlot(d.slot)) {
+      // a dish already in this slot just becomes part of the meal
+      d.meal.joined = true;
+      d.meal.people = head.people;
+      continue;
+    }
+    const slot = freeExtraSlot(toDay, base);
+    const fresh = req.keep ? { cooked: false, frozen: [] } : {};
+    toDay.meals[slot] = MealSchema.parse({ ...structuredClone(d.meal), ...fresh, people: head.people, joined: true });
+    if (!req.keep) {
+      setMeal(plans, { date: req.from.date, slot: d.slot }, null);
+      if (d.meal.type === "cook") repoint(plans, mealKey(req.from.date, d.slot), mealKey(to.date, slot));
     }
   }
-  return { mode: "repeat", placed: targets, replaced, cookMore };
+  evenPortions(toDay, base, toPlan, settings);
+  return { mode: "join", placed: [{ date: to.date, slot: base }], replaced: 0, cookMore: null };
 }

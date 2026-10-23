@@ -478,6 +478,11 @@ export class DataStore extends EventEmitter {
       for (const day of plan.days) for (const meal of Object.values(day.meals)) if (meal?.recipe === oldSlug) ((meal.recipe = newSlug), (changed = true));
       if (changed) await this.savePlan(plan);
     }
+    // recipes that suggest this one keep pointing at it
+    for (const other of this.listRecipes()) {
+      if (!other.meta.suggested.includes(oldSlug)) continue;
+      await this.mutateRecipe(other.slug, (meta) => ((meta.suggested = meta.suggested.map((s) => (s === oldSlug ? newSlug : s))), { meta }), { reason: `Renamed ${oldSlug} to ${newSlug}`, touch: false });
+    }
     this.bump({ kind: "recipe", id: newSlug });
     return recipe;
   }

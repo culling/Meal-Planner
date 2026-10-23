@@ -3,12 +3,17 @@ import { NotFoundError, ValidationError } from "./fsutil";
 import {
   aggregateShopping,
   availableLeftovers,
+  baseSlot,
   computeLeftovers,
   cookScale,
   copyPlan,
   dailyTotals,
+  evenPortions,
   extraSlotBase,
+  freeExtraSlot,
   isPrepSlot,
+  mealGroup,
+  removeDish,
   mealKey,
   mergeShopping,
   resolvePeople,
@@ -308,34 +313,105 @@ export class Planner {
           const source = src ? (src.date === date ? null : this.findMeal(otherWeek ?? plan, src.date, src.slot)) : null;
           if (source?.recipe) merged.recipe = source.recipe;
         }
+        // only an extra dish (dinner-2…) can be joined to the slot's first dish
+        if (!extraSlotBase(slot)) merged.joined = false;
         day.meals[slot] = merged;
+        this.shareWithMeal(plan, day, slot, merged.joined && !existing.joined ? "join" : patch);
       },
       expectedMtimeMs,
       at,
     );
   }
 
-  /** Remove a meal. Removing something that was cooked also removes the planned meals that eat its leftovers, in any later week. */
+  /**
+   * The other dishes of the meal `slot` is in follow its edit: the people count always, and the portions and freezing
+   * between cook dishes. A dish that has just joined a meal takes the meal's people instead, and every dish then cooks
+   * as many portions as the most of them.
+   */
+  private shareWithMeal(plan: MealPlan, day: DayPlan, slot: string, change: Partial<Meal> | "join") {
+    const settings = this.store.getSettings();
+    const meal = day.meals[slot]!;
+    const others = mealGroup(day, slot).filter((s) => s !== slot).map((s) => day.meals[s]!);
+    if (!others.length) return;
+    if (change === "join") {
+      meal.people = others[0].people;
+      evenPortions(day, slot, plan, settings);
+      return;
+    }
+    for (const o of others) {
+      if ("people" in change) o.people = meal.people;
+      if (meal.type === "cook" && o.type === "cook") {
+        if ("portions" in change) o.portions = meal.portions;
+        if ("frozen" in change) o.frozen = structuredClone(meal.frozen);
+      }
+    }
+  }
+
+  /** Add recipes to the meal in a slot, as dishes served with it (the rice and greens with the tofu). */
+  async addDishes(at: string, date: string, slot: string, recipes: string[]): Promise<PlanView> {
+    const settings = this.store.getSettings();
+    return this.mutatePlan(
+      this.weekFor(at, date),
+      (plan) => {
+        const day = this.dayOf(plan, date);
+        const base = baseSlot(slot);
+        const head = day.meals[mealGroup(day, base)[0]];
+        if (!head || isPrepSlot(slot)) throw new ValidationError("There's no meal there to add dishes to");
+        if (head.type === "eat-out" || head.type === "skip") throw new ValidationError("Add dishes to a meal you're cooking or eating leftovers of");
+        for (const recipe of recipes) {
+          if (!this.store.getRecipe(recipe)) throw new NotFoundError(`Recipe "${recipe}"`);
+          day.meals[freeExtraSlot(day, base)] = MealSchema.parse({ recipe, type: "cook", people: head.people, joined: true });
+        }
+        evenPortions(day, base, plan, settings);
+      },
+      undefined,
+      at,
+    );
+  }
+
+  /**
+   * Remove a dish. Removing something that was cooked also removes the planned meals that eat its leftovers, in any later
+   * week. Removing a meal's first dish leaves the rest of the meal: the next dish moves up into the slot.
+   */
   private async removeMeal(at: string, date: string, slot: string, expectedMtimeMs?: number | null): Promise<PlanView> {
     const week = this.weekFor(at, date);
     const plan = await this.store.getPlan(week);
     const day = this.dayOf(plan, date);
     const removed = day.meals[slot];
-    delete day.meals[slot];
+    // dishes that moved up into their meal's slot, as "date/old" → "date/new", so their leftovers follow
+    const moved = new Map<string, string>();
+    const move = removeDish(day, slot);
+    if (move) moved.set(mealKey(date, move.from), mealKey(date, move.to));
     await this.store.savePlan(plan, expectedMtimeMs ?? undefined);
-    if (removed?.type === "cook") {
-      const key = mealKey(date, slot);
+    const gone = removed?.type === "cook" ? mealKey(date, slot) : null;
+    if (gone || moved.size) {
       // leftovers come after the cooking, so only this week and later can hold them
       const weeks = (await this.store.listPlanWeeks()).filter((w) => w >= week);
+      const followed = new Set<Meal>();
       for (const w of weeks) {
         const p = await this.store.getPlan(w);
         let changed = false;
-        for (const d of p.days)
-          for (const [s, m] of Object.entries(d.meals))
-            if (m?.type === "leftovers" && m.leftoverFrom === key) {
-              delete d.meals[s];
-              changed = true;
+        for (const d of p.days) {
+          // removing a dish can move another up into its slot, so look at the day again after each removal
+          let again = true;
+          while (again) {
+            again = false;
+            for (const [s, m] of Object.entries(d.meals)) {
+              // a dish that moved up can take the removed one's slot: what eats it now points there, and stays
+              if (!m || followed.has(m)) continue;
+              if (m.leftoverFrom && moved.has(m.leftoverFrom)) {
+                m.leftoverFrom = moved.get(m.leftoverFrom)!;
+                followed.add(m);
+                changed = true;
+              } else if (m.type === "leftovers" && m.leftoverFrom === gone) {
+                const up = removeDish(d, s);
+                if (up) moved.set(mealKey(d.date, up.from), mealKey(d.date, up.to));
+                changed = again = true;
+                break;
+              }
             }
+          }
+        }
         if (changed) await this.store.savePlan(p);
       }
     }
@@ -371,7 +447,8 @@ export class Planner {
       }
       const meal = day.meals[level.slot];
       if (!meal) throw new NotFoundError(`Meal ${level.date}/${level.slot}`);
-      meal.people = value;
+      // everyone eats every dish of a meal
+      for (const s of mealGroup(day, level.slot)) day.meals[s]!.people = value;
     }, undefined, at);
   }
 
@@ -379,14 +456,17 @@ export class Planner {
     const settings = this.store.getSettings();
     const plan = await this.store.getPlan(this.weekFor(at, date));
     const day = this.dayOf(plan, date);
-    const meal = day.meals[slot];
-    if (!meal) throw new NotFoundError(`Meal ${date}/${slot}`);
+    if (!day.meals[slot]) throw new NotFoundError(`Meal ${date}/${slot}`);
     const cooked = opts.cooked ?? true;
-    if (cooked && !meal.cooked && meal.recipe && this.store.getRecipe(meal.recipe)) {
-      const people = resolvePeople(meal, day, plan, settings).value;
-      await this.store.logCooked(meal.recipe, { date: opts.cookDate ?? date, people, rating: opts.rating ?? null });
+    // the dishes of a meal are made together; each goes in its own recipe's cook log (the rating is for the one asked about)
+    for (const s of mealGroup(day, slot)) {
+      const meal = day.meals[s]!;
+      if (cooked && !meal.cooked && meal.recipe && this.store.getRecipe(meal.recipe)) {
+        const people = resolvePeople(meal, day, plan, settings).value;
+        await this.store.logCooked(meal.recipe, { date: opts.cookDate ?? date, people, rating: s === slot ? opts.rating ?? null : null });
+      }
+      meal.cooked = cooked;
     }
-    meal.cooked = cooked;
     await this.store.savePlan(plan);
     return this.viewOf(at);
   }
@@ -420,7 +500,7 @@ export class Planner {
    * Copy, extend or move a meal to other slots shown, or up to a week either side (see copymeals.ts). Returns the new view
    * plus snapshots of everything that was changed, so the change can be undone with restorePlans().
    */
-  async copyMeals(at: string, req: { from: SlotRef; to: SlotRef[]; mode?: CopyMode }): Promise<{ view: PlanView; result: CopyResult; undo: { plans: MealPlan[] }; message: string; weeks: string[] }> {
+  async copyMeals(at: string, req: { from: SlotRef; to: SlotRef[]; mode?: CopyMode; keep?: boolean }): Promise<{ view: PlanView; result: CopyResult; undo: { plans: MealPlan[] }; message: string; weeks: string[] }> {
     const settings = this.store.getSettings();
     const loaded = await Promise.all(this.nearbyWeeks(startOf(at)).map((w) => this.store.getPlan(w)));
     const before = loaded.map((p) => this.plain(p));
@@ -439,10 +519,13 @@ export class Planner {
     }
     const title = (slug: string | null) => (slug ? this.store.getRecipe(slug)?.meta.title ?? slug : "meal");
     const src = before.flatMap((p) => p.days).find((d) => d.date === req.from.date)?.meals[req.from.slot];
+    const dest = req.to[0] && before.flatMap((p) => p.days).find((d) => d.date === req.to[0].date)?.meals[baseSlot(req.to[0].slot)];
     const n = result.placed.length;
     const where = result.placed.map((t) => `${new Date(t.date + "T12:00:00").toLocaleDateString("en-NZ", { weekday: "short" })} ${t.slot}`).join(", ");
     let message =
-      result.mode === "move"
+      result.mode === "join"
+        ? `${title(src?.recipe ?? null)} added to ${title(dest?.recipe ?? null)}`
+        : result.mode === "move"
         ? `Moved to ${where}`
         : result.mode === "leftovers"
           ? `${title(src?.recipe ?? null)} leftovers on ${where}`

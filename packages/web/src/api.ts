@@ -100,6 +100,8 @@ export interface RecipeFull {
   mtimeMs: number;
   totalMinutes: number | null;
   parts: { ingredientsMd: string; methodMd: string; sourceNotes: string };
+  /** the recipes suggested with this one, and the recipes that suggest it */
+  goesWith: { suggested: RecipeSummary[]; suggestedBy: RecipeSummary[] };
 }
 
 export interface Facets {

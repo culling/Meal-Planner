@@ -166,6 +166,8 @@ export const RecipeMetaSchema = z
     favorite: z.boolean().default(false),
     hidden: z.boolean().default(false),
     rating: z.number().min(1).max(5).nullable().default(null),
+    /** slugs of recipes that go with this one as a meal (the rice and greens with salt and pepper tofu) */
+    suggested: z.array(z.string()).default([]),
     images: z
       .object({
         hero: z.string().nullable().default(null),
@@ -182,7 +184,9 @@ export type RecipeMeta = z.infer<typeof RecipeMetaSchema>;
 /** Parse recipe frontmatter; recipes saved before `role` existed get it inferred from their course. */
 export function parseRecipeMeta(raw: Record<string, unknown>): RecipeMeta {
   const role = raw.role == null || (Array.isArray(raw.role) && !raw.role.length) ? inferRole(raw.course as string[] | undefined) : raw.role;
-  return RecipeMetaSchema.parse({ ...raw, role });
+  // a recipe can't go with itself, and each suggestion is listed once
+  const suggested = Array.isArray(raw.suggested) ? [...new Set(raw.suggested)].filter((s) => s !== raw.id) : raw.suggested;
+  return RecipeMetaSchema.parse({ ...raw, role, suggested });
 }
 
 /** A parsed ingredient line. Derived from the Markdown, never written back. */
@@ -337,6 +341,8 @@ export const MealSchema = z
     /** cook meals: portions moved to the freezer */
     frozen: z.array(FrozenPortionsSchema).default([]),
     note: z.string().nullable().default(null),
+    /** an extra dish (dinner-2…) served as part of the slot's first dish's meal: they share people, portions and leftovers */
+    joined: z.boolean().default(false),
   })
   .passthrough();
 export type Meal = z.infer<typeof MealSchema>;

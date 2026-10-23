@@ -1,8 +1,8 @@
 # Progress
 
-_Latest:_ the plan and shopping list show 7 days from today; removing a cooked meal removes its leftovers; scrolling no longer gets stuck after closing nested dialogs; search and tag links look through sides too. See DECISIONS.md.
+_Latest:_ recipes can suggest the recipes that go with them ("Goes with" on the recipe page), and the plan treats dishes served together as one meal: drop a meal onto another to join them, and people, portions, leftovers, copying and moving apply to every dish. See DECISIONS.md.
 
-Status of the milestones in `recipe-planner-spec.md` §14. All automated tests pass (`npm run test:all`: 136 core, 13 server/API, 3 MCP, and 88 end-to-end browser tests) and `pnpm typecheck` is clean.
+Status of the milestones in `recipe-planner-spec.md` §14. All automated tests pass (`npm run test:all`: 153 core, 13 server/API, 3 MCP, and 92 end-to-end browser tests) and `pnpm typecheck` is clean.
 
 1. **Core data layer — done.** zod schemas; recipe/settings/plan/shopping/food files read and written; unchanged files are never rewritten; unknown fields preserved; atomic writes with modified-time conflict checks; file watcher; in-memory search index; git auto-commit.
 2. **Manual recipes + web UI — done.** List, view, create, edit, favourite, hide, notes (add/edit/delete), photo upload (main, step, "I made this"), raw Markdown editor, version history/restore, rename folder, delete to `.trash`.

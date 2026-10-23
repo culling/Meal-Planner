@@ -41,6 +41,48 @@ export function freeExtraSlot(day: { meals: Record<string, unknown> }, base: str
   for (let n = 2; ; n++) if (!day.meals[`${base}-${n}`]) return `${base}-${n}`;
 }
 
+// ---------- dishes served as one meal ----------
+// Salt and pepper tofu with rice and greens: the slot's first dish (dinner) and the extras marked `joined` (dinner-2…)
+// are one meal. They share the people count, the portions cooked and the freezing, and are moved, repeated and turned
+// into leftovers together. An extra that isn't joined is a separate dish that happens to be in the same slot.
+
+/** The slots of the dishes served as one meal with the dish in `slot` (itself included), in slot order. */
+export function mealGroup(day: { meals: Record<string, Pick<Meal, "joined"> | null | undefined> }, slot: string): string[] {
+  const base = extraSlotBase(slot);
+  if (isPrepSlot(slot) || (base && !day.meals[slot]?.joined)) return [slot];
+  const head = base ?? slot;
+  const joined = Object.keys(day.meals)
+    .filter((s) => extraSlotBase(s) === head && day.meals[s]?.joined)
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  return [...(day.meals[head] ? [head] : []), ...joined];
+}
+
+/**
+ * Take a dish out of a day. Removing a meal's first dish keeps the rest of the meal: the next dish moves up into the slot.
+ * Returns that move ("dinner-2" → "dinner") so leftovers of the dish can follow it.
+ */
+export function removeDish(day: { meals: Record<string, Meal | null | undefined> }, slot: string): { from: string; to: string } | null {
+  const rest = day.meals[slot] && !extraSlotBase(slot) ? mealGroup(day, slot).slice(1) : [];
+  delete day.meals[slot];
+  if (!rest.length) return null;
+  day.meals[slot] = { ...day.meals[rest[0]]!, joined: false };
+  delete day.meals[rest[0]];
+  return { from: rest[0], to: slot };
+}
+
+/** Raise every cook dish of the meal in `slot` to the most portions any of them cooks, so nobody's leftovers fall short. */
+export function evenPortions(day: DayPlan, slot: string, plan: Pick<MealPlan, "defaultPeople">, settings: Pick<Settings, "defaultPeople">): void {
+  const cooks = mealGroup(day, slot)
+    .map((s) => day.meals[s])
+    .filter((m): m is Meal => m?.type === "cook");
+  if (cooks.length < 2) return;
+  const each = cooks.map((m) => m.portions ?? resolvePeople(m, day, plan, settings).value);
+  const most = Math.max(...each);
+  cooks.forEach((m, i) => {
+    if (each[i] < most) m.portions = most;
+  });
+}
+
 // ---------- people ----------
 
 export type PeopleSource = "meal" | "day" | "week" | "settings";
@@ -460,10 +502,10 @@ export function suggestPlan(plan: MealPlan, settings: Settings, opts: SuggestOpt
     const keepsDays = pick.meta.leftovers.fridgeDays ?? settings.defaultLeftoverFridgeDays;
     const lunchFree = !!(lunchSlot && tomorrow && !tomorrow.meals[lunchSlot] && keepsDays >= 1);
     const portions = lunchFree ? people * 2 : people;
-    day.meals[mainSlot] = { recipe: pick.slug, people: null, type: "cook", portions: lunchFree ? portions : null, cooked: false, leftoverFrom: null, leftoverStore: "fridge", frozen: [], note: null };
+    day.meals[mainSlot] = { recipe: pick.slug, people: null, type: "cook", portions: lunchFree ? portions : null, cooked: false, leftoverFrom: null, leftoverStore: "fridge", frozen: [], note: null, joined: false };
     notes.push(`${day.date}: ${pick.meta.title}${lunchFree ? " (cook double for tomorrow's lunch)" : ""}`);
     if (lunchFree && tomorrow && lunchSlot) {
-      tomorrow.meals[lunchSlot] = { recipe: pick.slug, people: null, type: "leftovers", portions: null, cooked: false, leftoverFrom: mealKey(day.date, mainSlot), leftoverStore: "fridge", frozen: [], note: null };
+      tomorrow.meals[lunchSlot] = { recipe: pick.slug, people: null, type: "leftovers", portions: null, cooked: false, leftoverFrom: mealKey(day.date, mainSlot), leftoverStore: "fridge", frozen: [], note: null, joined: false };
     }
   }
   return { plan: next, notes };

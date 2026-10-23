@@ -89,7 +89,7 @@ describe("recipes", () => {
   it("renames a slug and updates meal plans", async () => {
     const r = await ctx.store.createRecipe(input);
     const plan = await ctx.store.getPlan("2026-W42");
-    plan.days[0].meals.dinner = { recipe: r.slug, people: null, type: "cook", portions: null, cooked: false, leftoverFrom: null, leftoverStore: "fridge", frozen: [], note: null };
+    plan.days[0].meals.dinner = { recipe: r.slug, people: null, type: "cook", portions: null, cooked: false, leftoverFrom: null, leftoverStore: "fridge", frozen: [], note: null, joined: false };
     await ctx.store.savePlan(plan);
     await ctx.store.renameSlug(r.slug, "butter-chook");
     const after = await ctx.store.getPlan("2026-W42");
@@ -157,7 +157,7 @@ describe("settings, foods, plans", () => {
     const r = await ctx.store.createRecipe(input);
     const plan = await ctx.store.getPlan("2026-W42");
     plan.defaultPeople = 3;
-    plan.days[0].meals.dinner = { recipe: r.slug, people: 4, type: "cook", portions: null, cooked: false, leftoverFrom: null, leftoverStore: "fridge", frozen: [], note: null };
+    plan.days[0].meals.dinner = { recipe: r.slug, people: 4, type: "cook", portions: null, cooked: false, leftoverFrom: null, leftoverStore: "fridge", frozen: [], note: null, joined: false };
     const saved = await ctx.store.savePlan(plan);
     expect(saved.saved).toBe(true);
     const text = await fs.readFile(path.join(ctx.dir, "meal-plans", "2026-W42.md"), "utf8");

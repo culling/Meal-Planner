@@ -9,6 +9,7 @@ import {
   diffDays,
   isPrepSlot,
   isValidWeek,
+  mealGroup,
   todayYmd,
   weekStartDate,
   windowStartFor,
@@ -61,10 +62,10 @@ export function PlanPage() {
   const setView = (v: PlanView) => qc.setQueryData(["plan", week], v);
 
   // ----- copying, extending and moving meals -----
-  type CopyMode = "auto" | "repeat" | "leftovers" | "move";
+  type CopyMode = "auto" | "repeat" | "leftovers" | "move" | "join";
   interface CopyReply {
     view: PlanView;
-    result: { mode: "repeat" | "leftovers" | "move"; placed: SlotRef[] };
+    result: { mode: "repeat" | "leftovers" | "move" | "join"; placed: SlotRef[] };
     undo: { plans: unknown[] };
     message: string;
     weeks: string[];
@@ -84,9 +85,9 @@ export function PlanPage() {
       toast(errMsg(e), "bad");
     }
   };
-  const runCopy = async (from: SlotRef, to: SlotRef[], mode: CopyMode) => {
+  const runCopy = async (from: SlotRef, to: SlotRef[], mode: CopyMode, keep?: boolean) => {
     try {
-      const r = await api.post<CopyReply>(`/api/meal-plans/${week}/copy`, { from, to, mode });
+      const r = await api.post<CopyReply>(`/api/meal-plans/${week}/copy`, { from, to, mode, keep });
       setView(r.view);
       refreshPlans();
       const outside = r.result.placed.map((p) => p.date).find((d) => d < r.view.startDate || d > r.view.endDate);
@@ -108,12 +109,19 @@ export function PlanPage() {
       toast(errMsg(e), "bad");
     }
   };
+  /** Is there a meal in this slot to add dishes to? (Dropping a meal on one serves them together.) */
+  const hasMeal = (r: SlotRef) => {
+    const d = view?.days.find((x) => x.date === r.date);
+    return !!d && !isPrepSlot(r.slot) && (!!d.meals[r.slot] || d.extras.some((x) => x.base === r.slot && x.meal.joined));
+  };
   const { drag, handleProps, mealProps } = usePlanDrag({
     onFill: (from, targets) => void runCopy(from, targets, "auto"),
     onHandleTap: (from) => setFill({ from, targets: [], mode: "auto" }),
     onMove: (from, to, copy) => {
       // a make-ahead dropped on a meal is eaten there (as leftovers); between make-ahead rows it moves / is cooked again
       if (isPrepSlot(from.slot)) void runCopy(from, [to], isPrepSlot(to.slot) ? (copy ? "repeat" : "move") : "leftovers");
+      // dropped on another meal: serve them together (Ctrl keeps the original where it was)
+      else if (hasMeal(to)) void runCopy(from, [to], "join", copy);
       else void runCopy(from, [to], copy ? "repeat" : "move");
     },
   });
@@ -141,6 +149,14 @@ export function PlanPage() {
       void qc.invalidateQueries({ queryKey: ["shopping"] });
       return v;
     });
+  /** Add recipes to the meal in a slot, as dishes served with it. */
+  const addDishes = (date: string, slot: string, recipes: string[]) =>
+    act(async () => {
+      const v = await api.post<PlanView>(`/api/meal-plans/${week}/days/${date}/meals/${slot}/dishes`, { recipes });
+      setView(v);
+      void qc.invalidateQueries({ queryKey: ["shopping"] });
+      return v;
+    });
 
   const copyLast = async () => {
     let overwrite = false;
@@ -157,6 +173,14 @@ export function PlanPage() {
   const allSet = view.days.every((d) => d.people.from === "day");
   const allDefault = view.days.every((d) => d.people.from === "settings");
   const slots = view.slots;
+  // carrying a meal over another meal: it will be served with it
+  const dropOn = (() => {
+    const t = drag?.kind === "move" && !isPrepSlot(drag.from.slot) ? drag.targets[0] : undefined;
+    if (!t) return null;
+    const ref = { date: t.slice(0, 10), slot: t.slice(11) };
+    const d = view.days.find((x) => x.date === ref.date);
+    return hasMeal(ref) ? (d?.meals[ref.slot]?.title ?? d?.extras.find((x) => x.base === ref.slot && x.meal.joined)?.title ?? "that meal") : null;
+  })();
   return (
     <>
       <div className="week-nav">
@@ -246,15 +270,20 @@ export function PlanPage() {
               const extras = day.extras.filter((x) => x.base === slot);
               const entries = [{ slot, mv }, ...extras.map((x) => ({ slot: x.slot, mv: x as MealView | null }))];
               const stacked = !!mv || extras.length > 0;
+              // the dishes served as one meal are drawn as one card; other dishes in the slot follow it
+              const group = mealGroup({ meals: Object.fromEntries(entries.map((e) => [e.slot, e.mv?.meal])) }, slot);
+              const inGroup = (es: string) => group.length > 1 && group.includes(es);
+              const occupied = hasMeal({ date: day.date, slot });
               const warns = warningFor(day.date, slot);
               const key = slotKey({ date: day.date, slot });
               const isSource = drag?.from && slotKey(drag.from) === key;
               const isTarget = !!drag?.targets.includes(key) || (drag?.kind === "fill" && drag.hover === key && key !== slotKey(drag.from));
+              const joining = isTarget && drag?.kind === "move" && occupied && !isPrepSlot(drag.from.slot);
               const picked = !!fill?.targets.includes(key);
               const isFillSource = !!fill && slotKey(fill.from) === key;
               return (
                 <div
-                  className={`slot ${isSource ? "drag-source" : ""} ${isTarget ? (drag?.kind === "move" && !drag.copy ? "drop-move" : "drop-target") : ""} ${picked ? "fill-picked" : ""} ${isFillSource ? "fill-source" : ""} ${fill && !isFillSource ? "fill-choosing" : ""}`}
+                  className={`slot ${isSource ? "drag-source" : ""} ${isTarget ? (joining ? "drop-join" : drag?.kind === "move" && !drag.copy ? "drop-move" : "drop-target") : ""} ${picked ? "fill-picked" : ""} ${isFillSource ? "fill-source" : ""} ${fill && !isFillSource ? "fill-choosing" : ""}`}
                   key={slot}
                   style={{ ["--row" as any]: r + 2 }}
                   data-slot-date={day.date}
@@ -270,37 +299,53 @@ export function PlanPage() {
                   onDragOver={(e) => e.dataTransfer.types.includes("text/recipe") && e.preventDefault()}
                   onDrop={(e) => {
                     const slug = e.dataTransfer.getData("text/recipe");
-                    if (slug) void put(day.date, slot, { recipe: slug, type: "cook" });
+                    // a recipe dropped on a meal is served with it; on an empty slot it is the meal
+                    if (slug) void (occupied ? addDishes(day.date, slot, [slug]) : put(day.date, slot, { recipe: slug, type: "cook" }));
                   }}
                 >
                   <div className="slot-label">{slot}</div>
                   <div className={`slot-body ${stacked ? "stack-body" : ""}`}>
-                    {entries.map(({ slot: es, mv: emv }) => {
-                      const ew = es === slot ? warns : warningFor(day.date, es);
-                      return (
-                        <div className="slot-item" key={es}>
-                          <MealButton
-                            mv={emv}
-                            warns={ew.length > 0}
-                            onClick={() => setDialog({ date: day.date, slot: es })}
-                            dragProps={emv ? mealProps({ date: day.date, slot: es }, emv.title ?? es) : undefined}
-                          />
-                          {emv && !fill && (
-                            <span
-                              className="fill-handle"
-                              role="button"
-                              tabIndex={0}
-                              aria-label={`Copy ${emv.title ?? "this meal"} to other meals: drag across the slots, or press to choose them`}
-                              title="Drag across other slots to copy this meal there · click to choose slots"
-                              {...handleProps({ date: day.date, slot: es }, emv.title ?? es)}
+                    {(() => {
+                      const item = ({ slot: es, mv: emv }: (typeof entries)[number]) => {
+                        const ew = es === slot ? warns : warningFor(day.date, es);
+                        const joined = inGroup(es) && es !== group[0];
+                        return (
+                          <div className={`slot-item ${joined ? "joined" : ""}`} key={es}>
+                            <MealButton
+                              mv={emv}
+                              warns={ew.length > 0}
+                              onClick={() => setDialog({ date: day.date, slot: es })}
+                              dragProps={emv ? mealProps({ date: day.date, slot: es }, emv.title ?? es) : undefined}
                             />
+                            {/* a joined dish is copied with its meal: the handle is on the meal's first dish */}
+                            {emv && !fill && !joined && (
+                              <span
+                                className="fill-handle"
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`Copy ${emv.title ?? "this meal"} to other meals: drag across the slots, or press to choose them`}
+                                title="Drag across other slots to copy this meal there · click to choose slots"
+                                {...handleProps({ date: day.date, slot: es }, emv.title ?? es)}
+                              />
+                            )}
+                          </div>
+                        );
+                      };
+                      const together = entries.filter((e) => inGroup(e.slot));
+                      return (
+                        <>
+                          {together.length > 0 && (
+                            <div className="meal-group" role="group" aria-label={`Served together: ${together.map((e) => e.mv?.title).join(", ")}`}>
+                              {together.map(item)}
+                            </div>
                           )}
-                        </div>
+                          {entries.filter((e) => !inGroup(e.slot) && (e.mv || e.slot === slot)).map(item)}
+                        </>
                       );
-                    })}
+                    })()}
                     {stacked && !fill && (
                       <button className="prep-add" onClick={() => setDialog({ date: day.date, slot: freeExtraSlot({ meals: Object.fromEntries(extras.map((x) => [x.slot, 1])) }, slot) })}>
-                        ＋ Add another
+                        ＋ Add a dish
                       </button>
                     )}
                   </div>
@@ -362,9 +407,10 @@ export function PlanPage() {
       </div>
 
       {drag && (
-        <div className={`drag-ghost ${drag.kind === "move" && drag.copy ? "copying" : ""}`} style={{ left: drag.x + 14, top: drag.y + 14 }} aria-hidden="true">
+        <div className={`drag-ghost ${dropOn ? "joining" : drag.kind === "move" && drag.copy ? "copying" : ""}`} style={{ left: drag.x + 14, top: drag.y + 14 }} aria-hidden="true">
           {drag.kind === "fill" ? "＋ " : drag.copy ? "⧉ copy " : "↔ "}
           {drag.label}
+          {dropOn ? ` with ${dropOn}` : ""}
           {drag.kind === "fill" && drag.targets.length + (drag.hover && !drag.targets.includes(drag.hover) && drag.hover !== slotKey(drag.from) ? 1 : 0) > 1 ? ` ×${drag.targets.length + (drag.hover && !drag.targets.includes(drag.hover) && drag.hover !== slotKey(drag.from) ? 1 : 0)}` : ""}
         </div>
       )}
@@ -403,7 +449,7 @@ export function PlanPage() {
 
       {!empty && !fill && (
         <p className="small muted center" style={{ margin: 0 }}>
-          Tip: drag a meal’s round handle along a row of slots to copy it (pause on another meal’s slot to include it too) · hold Ctrl and drag a meal to duplicate it · drag a meal to move it.
+          Tip: drag a meal’s round handle along a row of slots to copy it (pause on another meal’s slot to include it too) · hold Ctrl and drag a meal to duplicate it · drag a meal to move it · drop it on another meal to serve them together.
         </p>
       )}
 
@@ -445,13 +491,16 @@ export function PlanPage() {
           slot={dialog.slot}
           warns={warningFor(dialog.date, dialog.slot).map((w) => w.message)}
           onClose={() => setDialog(null)}
-          onSave={async (meal) => {
-            const v = await put(dialog.date, dialog.slot, meal);
+          onSave={async (meal, dishes) => {
+            let v = await put(dialog.date, dialog.slot, meal);
+            if (v && dishes.length) v = await addDishes(dialog.date, dialog.slot, dishes);
             if (v) setDialog(null);
           }}
-          onRemove={async () => {
-            const v = await put(dialog.date, dialog.slot, null);
-            if (v) setDialog(null);
+          onRemove={async (slots) => {
+            // the joined dishes first, so the first dish doesn't move up into the slot on the way
+            let v: PlanView | null = null;
+            for (const s of [...slots].reverse()) if (!(v = await put(dialog.date, s, null))) return;
+            setDialog(null);
           }}
           onCooked={async (cooked, rating) => {
             const v = await act(() => api.post<PlanView>(`/api/meal-plans/${week}/days/${dialog.date}/meals/${dialog.slot}/cooked`, { cooked, rating }), cooked ? "Logged in the recipe's cook log" : undefined);
@@ -717,15 +766,25 @@ function MealDialog({
   slot: string;
   warns: string[];
   onClose: () => void;
-  onSave: (meal: Partial<Meal>) => Promise<void>;
-  onRemove: () => Promise<void>;
+  /** `dishes`: recipes to add to the meal as dishes served with it */
+  onSave: (meal: Partial<Meal>, dishes: string[]) => Promise<void>;
+  /** the slots of the dishes to remove: this one, or every dish of its meal */
+  onRemove: (slots: string[]) => Promise<void>;
   onCooked: (cooked: boolean, rating: number | null) => Promise<void>;
   onPeople: (people: number | null) => Promise<void>;
   onCopy: (from: SlotRef, to: SlotRef[], mode: "auto" | "repeat" | "leftovers") => void;
 }) {
   const day = view.days.find((d) => d.date === date)!;
-  const existing = day.meals[slot] ?? null;
+  // a second dish in the slot (dinner-2) is kept with the day's extras
+  const existing = day.meals[slot] ?? day.extras.find((x) => x.slot === slot) ?? null;
   const m0 = existing?.meal;
+  // the dishes served as one meal with this one, and the slot's first dish (for an added dish to join)
+  const views: Record<string, MealView> = Object.fromEntries([...Object.entries(day.meals).filter((e): e is [string, MealView] => !!e[1]), ...day.extras.map((x) => [x.slot, x] as const)]);
+  const base = baseSlot(slot);
+  const head = base !== slot ? views[base] : undefined;
+  const [joined, setJoined] = useState(m0 ? m0.joined : !!head && head.meal.type !== "eat-out" && head.meal.type !== "skip");
+  const group = mealGroup({ meals: Object.fromEntries(Object.entries({ ...views, [slot]: { meal: { joined } } }).map(([k, v]) => [k, v.meal])) }, slot).filter((s) => s === slot || views[s]);
+  const others = group.filter((s) => s !== slot).map((s) => views[s].title ?? s);
   const [type, setType] = useState<MealType>(m0?.type ?? "cook");
   const [recipe, setRecipe] = useState<string | null>(m0?.recipe ?? null);
   const [people, setPeople] = useState<number | null>(m0?.people ?? null);
@@ -738,6 +797,11 @@ function MealDialog({
   const [busy, setBusy] = useState(false);
   const { data: rec } = useRecipe(type === "cook" || type === "leftovers" ? recipe ?? undefined : undefined);
   const [options, setOptions] = useState<LeftoverOption[] | null>(null);
+  // the recipes suggested with this one that aren't in the meal yet; ticked when the recipe was just chosen
+  const inMeal = new Set(group.map((s) => views[s]?.meal.recipe));
+  const suggestions = type === "cook" && (!head || joined) && rec?.slug === recipe ? (rec?.goesWith.suggested ?? []).filter((x) => !inMeal.has(x.slug)) : [];
+  const [adding, setAdding] = useState<Record<string, boolean>>({});
+  const willAdd = (slug: string) => adding[slug] ?? recipe !== (m0?.recipe ?? null);
 
   useEffect(() => {
     if (type !== "leftovers") return;
@@ -760,7 +824,8 @@ function MealDialog({
     } else {
       Object.assign(meal, { recipe: null, note: note || null });
     }
-    await onSave(meal);
+    if (head) meal.joined = joined;
+    await onSave(meal, suggestions.filter((x) => willAdd(x.slug)).map((x) => x.slug));
     setBusy(false);
   };
 
@@ -776,6 +841,20 @@ function MealDialog({
           </div>
         )}
         <Seg fill value={type} options={(["cook", "leftovers", "eat-out", "skip"] as MealType[]).map((t) => ({ value: t, label: TYPE_LABEL[t] }))} onChange={setType} />
+
+        {head && (
+          <label className="check">
+            <input type="checkbox" checked={joined} onChange={(e) => setJoined(e.target.checked)} disabled={head.meal.type === "eat-out" || head.meal.type === "skip"} />
+            Part of the meal with {head.title ?? "the first dish"} (same people, portions and leftovers)
+          </label>
+        )}
+        {others.length > 0 && (!head || joined) && (
+          <div className="notice">
+            <div>
+              Served with <b>{others.join(", ")}</b> as one meal: the people, portions and freezing you set here apply to every dish, and moving, copying or making leftovers{head ? " of the first dish" : ""} takes them all.
+            </div>
+          </div>
+        )}
 
         {type === "cook" && (
           <div className="stack tight">
@@ -796,6 +875,17 @@ function MealDialog({
               <button className="btn primary block" onClick={() => setPicker(true)}>
                 Choose a recipe
               </button>
+            )}
+            {suggestions.length > 0 && (
+              <div className="row wrap" style={{ gap: 6 }}>
+                <span className="small muted">Goes with — add to the meal:</span>
+                {suggestions.map((x) => (
+                  <button key={x.slug} type="button" className={`chip ${willAdd(x.slug) ? "on" : ""}`} style={{ cursor: "pointer" }} aria-pressed={willAdd(x.slug)} onClick={() => setAdding({ ...adding, [x.slug]: !willAdd(x.slug) })}>
+                    {willAdd(x.slug) ? "✓ " : "＋ "}
+                    {x.title}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         )}
@@ -937,7 +1027,7 @@ function MealDialog({
                   <Stars value={rating} onChange={setRating} />
                 </div>
                 <button className="btn soft block" onClick={() => onCooked(true, rating)}>
-                  ✓ Mark as cooked
+                  ✓ Mark {others.length && (!head || joined) ? "the meal" : ""} as cooked
                 </button>
               </>
             )}
@@ -948,8 +1038,13 @@ function MealDialog({
 
         <div className="row">
           {existing && (
-            <button className="btn danger" onClick={onRemove}>
-              Remove
+            <button className="btn danger" onClick={() => onRemove([slot])}>
+              {others.length ? "Remove this dish" : "Remove"}
+            </button>
+          )}
+          {existing && others.length > 0 && (!head || joined) && (
+            <button className="btn danger" onClick={() => onRemove(group)}>
+              Remove the meal
             </button>
           )}
           <span className="grow" />

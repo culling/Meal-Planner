@@ -35,6 +35,8 @@ export function AddToPlanModal({ recipe, onClose }: { recipe: RecipeFull; onClos
   const [extra, setExtra] = useState(false);
   const [people, setPeople] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  // the recipes suggested with this one go in as part of the same meal, unless unticked
+  const [withDishes, setWithDishes] = useState<string[]>(recipe.goesWith.suggested.map((s) => s.slug));
   const slots = settings?.mealSlots ?? ["breakfast", "lunch", "dinner"];
   const basePeople = people ?? settings?.defaultPeople ?? 2;
 
@@ -45,6 +47,7 @@ export function AddToPlanModal({ recipe, onClose }: { recipe: RecipeFull; onClos
       await api.put(`/api/meal-plans/${week}/days/${date}/meals/${slot}`, {
         meal: { recipe: recipe.slug, type: "cook", people, portions: extra ? basePeople * 2 : null, cooked: false },
       });
+      if (withDishes.length) await api.post(`/api/meal-plans/${week}/days/${date}/meals/${slot}/dishes`, { recipes: withDishes });
       void qc.invalidateQueries({ queryKey: ["plan"] });
       toast(`Added to ${fmtDate(date)}`);
       onClose();
@@ -84,6 +87,17 @@ export function AddToPlanModal({ recipe, onClose }: { recipe: RecipeFull; onClos
           <input type="checkbox" checked={extra} onChange={(e) => setExtra(e.target.checked)} />
           Cook double so there are leftovers
         </label>
+        {recipe.goesWith.suggested.length > 0 && (
+          <div className="field">
+            <label>Serve it with</label>
+            {recipe.goesWith.suggested.map((s) => (
+              <label className="check" key={s.slug}>
+                <input type="checkbox" checked={withDishes.includes(s.slug)} onChange={(e) => setWithDishes(e.target.checked ? [...withDishes, s.slug] : withDishes.filter((x) => x !== s.slug))} />
+                {s.title}
+              </label>
+            ))}
+          </div>
+        )}
         <button className="btn primary block" disabled={busy} onClick={add}>
           Add to {fmtDate(date)} {slot}
         </button>

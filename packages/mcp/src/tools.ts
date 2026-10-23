@@ -55,6 +55,7 @@ const mealPatch = {
   leftoverFrom: z.string().nullable().optional().describe('Leftover meals: "YYYY-MM-DD/slot" of the cook meal'),
   leftoverStore: z.enum(["fridge", "freezer"]).optional(),
   note: z.string().nullable().optional(),
+  joined: z.boolean().optional().describe("Extra dishes (dinner-2…): true = part of the slot's first dish's meal, sharing its people, portions and leftovers"),
 };
 
 const brief = (r: Recipe) => ({
@@ -233,10 +234,10 @@ export function buildTools(app: App): ToolDef[] {
     },
     {
       name: "copy_meal",
-      description: "Copy a planned meal to other slots (also into the next/previous week). mode: leftovers (eat it as leftovers and cook enough), repeat (cook again), move, or auto (leftovers while the food keeps, otherwise repeat).",
-      shape: { week, from: z.object({ date: z.string(), slot: z.string() }), to: z.array(z.object({ date: z.string(), slot: z.string() })).min(1), mode: z.enum(["auto", "repeat", "leftovers", "move"]).optional() },
-      handler: async ({ week: w, from, to, mode }) => {
-        const r = await planner.copyMeals(wk(w ?? isoWeekOf(from.date)), { from, to, mode });
+      description: "Copy a planned meal to other slots (also into the next/previous week). mode: leftovers (eat it as leftovers and cook enough), repeat (cook again), move, auto (leftovers while the food keeps, otherwise repeat), or join (add it to the meal already in the one target slot, as a dish served with it; keep:true copies instead of moving). A meal's first dish brings its joined dishes along.",
+      shape: { week, from: z.object({ date: z.string(), slot: z.string() }), to: z.array(z.object({ date: z.string(), slot: z.string() })).min(1), mode: z.enum(["auto", "repeat", "leftovers", "move", "join"]).optional(), keep: z.boolean().optional() },
+      handler: async ({ week: w, from, to, mode, keep }) => {
+        const r = await planner.copyMeals(wk(w ?? isoWeekOf(from.date)), { from, to, mode, keep });
         return { summary: r.message, data: { mode: r.result.mode, weeks: r.weeks } };
       },
     },

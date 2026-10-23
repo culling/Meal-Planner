@@ -12,7 +12,7 @@ import {
   nowIso,
   type App,
 } from "@mp/core";
-import { fullRecipe, readMultipart, startNutritionJob, summarise } from "./util";
+import { fullRecipe, goesWith, readMultipart, startNutritionJob, summarise } from "./util";
 
 const MIME: Record<string, string> = { ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif" };
 
@@ -23,7 +23,7 @@ export function registerRecipeRoutes(server: FastifyInstance, app: App) {
 
   const load = (slug: string) => {
     const r = store.requireRecipe(slug);
-    return fullRecipe(r, store.bodyParts(slug));
+    return { ...fullRecipe(r, store.bodyParts(slug)), goesWith: goesWith(store, r) };
   };
 
   server.get("/api/recipes", async (req) => {

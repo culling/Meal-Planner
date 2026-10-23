@@ -98,6 +98,21 @@ export function fullRecipe(r: Recipe, parts: { ingredientsMd: string; methodMd: 
   };
 }
 
+/** The recipes suggested with this one (that still exist), and the recipes that suggest it. */
+export function goesWith(store: App["store"], r: Recipe) {
+  return {
+    suggested: r.meta.suggested.flatMap((slug) => {
+      const s = store.getRecipe(slug);
+      return s ? [summarise(s)] : [];
+    }),
+    suggestedBy: store
+      .listRecipes()
+      .filter((o) => o.slug !== r.slug && o.meta.suggested.includes(r.slug))
+      .map(summarise)
+      .sort((a, b) => a.title.localeCompare(b.title)),
+  };
+}
+
 /** Start a background job that asks the local model to work out a recipe's nutrition and saves the result. */
 export function startNutritionJob(app: App, slug: string, keepManual?: boolean) {
   const { store } = app;

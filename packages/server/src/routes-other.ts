@@ -118,6 +118,12 @@ export function registerOtherRoutes(server: FastifyInstance, app: App) {
     return planner.markCooked(week(req.params.week), req.params.date, req.params.slot, b);
   });
 
+  /** Add recipes to the meal in a slot, as dishes served with it. */
+  server.post<{ Params: { week: string; date: string; slot: string } }>("/api/meal-plans/:week/days/:date/meals/:slot/dishes", async (req) => {
+    const { recipes } = z.object({ recipes: z.array(z.string()).min(1).max(10) }).parse(req.body);
+    return planner.addDishes(week(req.params.week), req.params.date, req.params.slot, recipes);
+  });
+
   server.post<{ Params: { week: string } }>("/api/meal-plans/:week/freeze", async (req) => {
     const { key, date } = z.object({ key: z.string(), date: z.string().optional() }).parse(req.body);
     return planner.freezeRemaining(week(req.params.week), key, date);

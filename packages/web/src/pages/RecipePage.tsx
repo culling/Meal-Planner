@@ -2,8 +2,9 @@ import { formatIngredient, todayYmd, type GalleryItem } from "@mp/core/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { api, useRecipe, type RecipeFull } from "../api";
+import { api, useRecipe, type RecipeFull, type RecipeSummary } from "../api";
 import { NutritionPanel } from "../components/NutritionPanel";
+import { RecipePicker } from "../components/RecipePicker";
 import { AddToPlanModal, CookedModal, HistoryModal, LeftoversModal, RawModal, RenameModal, Stars } from "../components/RecipeModals";
 import { Calendar, Camera, ChevL, Clock, Copy, Edit, EyeOff, Fridge, Heart, History, Image as ImageIcon, Snow, Trash, Users, Utensils } from "../icons";
 import { CheckBox, ErrorBox, fmtDate, fmtMinutes, Loading, Menu, SourceBadge, Stepper, errMsg, useConfirm, useToast } from "../ui";
@@ -262,6 +263,8 @@ function RecipeView({ r, initialServings }: { r: RecipeFull; initialServings?: n
         </div>
       </div>
 
+      <GoesWith r={r} onChange={(suggested) => run(() => api.patch(`/api/recipes/${r.slug}`, { suggested }))} />
+
       <NutritionPanel recipe={r} />
 
       <div className="card">
@@ -435,6 +438,59 @@ function RecipeView({ r, initialServings }: { r: RecipeFull; initialServings?: n
       {modal === "rename" && <RenameModal recipe={r} onClose={() => setModal(null)} />}
       {modal === "leftovers" && <LeftoversModal recipe={r} onClose={() => setModal(null)} />}
     </>
+  );
+}
+
+/** The recipes served with this one as a meal (rice and greens with the tofu), and the recipes that suggest this one. */
+function GoesWith({ r, onChange }: { r: RecipeFull; onChange: (suggested: string[]) => Promise<void> }) {
+  const [picker, setPicker] = useState(false);
+  const { suggested, suggestedBy } = r.goesWith;
+  const card = (s: RecipeSummary, remove?: () => void) => (
+    <div className="card flat row goes-with" key={s.slug}>
+      {s.hero ? <img className="thumb" src={`/images/${s.slug}/${s.hero}?w=120`} alt="" /> : <span className="thumb">🍽️</span>}
+      <Link className="grow" to={`/recipes/${s.slug}`} style={{ fontWeight: 800 }}>
+        {s.title}
+      </Link>
+      {remove && (
+        <button className="btn ghost icon sm" aria-label={`Don't suggest ${s.title}`} title="Don't suggest it" onClick={remove}>
+          ✕
+        </button>
+      )}
+    </div>
+  );
+  return (
+    <div className="card">
+      <div className="section-title">
+        <h2>Goes with</h2>
+        <button className="btn sm" onClick={() => setPicker(true)}>
+          ＋ Add a suggested recipe
+        </button>
+      </div>
+      {suggested.length === 0 ? (
+        <p className="muted small" style={{ margin: 0 }}>
+          Add the recipes you serve with this one — a side, rice, a sauce. When you plan it they're offered too, and the plan treats them as one meal.
+        </p>
+      ) : (
+        <div className="stack tight">{suggested.map((s) => card(s, () => void onChange(r.meta.suggested.filter((x) => x !== s.slug))))}</div>
+      )}
+      {suggestedBy.length > 0 && (
+        <div className="stack tight" style={{ marginTop: 12 }}>
+          <div className="small muted">Suggested with</div>
+          {suggestedBy.map((s) => card(s))}
+        </div>
+      )}
+      {picker && (
+        <RecipePicker
+          title={`What goes with ${r.meta.title}?`}
+          initial={{ role: ["main", "side"] }}
+          onClose={() => setPicker(false)}
+          onPick={(s) => {
+            setPicker(false);
+            if (s.slug !== r.slug && !r.meta.suggested.includes(s.slug)) void onChange([...r.meta.suggested.filter((x) => suggested.some((y) => y.slug === x)), s.slug]);
+          }}
+        />
+      )}
+    </div>
   );
 }
 

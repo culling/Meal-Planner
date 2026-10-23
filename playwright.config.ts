@@ -45,8 +45,10 @@ export default defineConfig({
     { name: "plan-phone", testMatch: "plan-drag.spec.ts", use: phone, dependencies: ["plan-desktop"] },
     { name: "makeahead-desktop", testMatch: "makeahead.spec.ts", use: desktop, dependencies: ["plan-phone"] },
     { name: "makeahead-phone", testMatch: "makeahead.spec.ts", use: phone, dependencies: ["makeahead-desktop"] },
+    { name: "groups-desktop", testMatch: "meal-groups.spec.ts", use: desktop, dependencies: ["makeahead-phone"] },
+    { name: "groups-phone", testMatch: "meal-groups.spec.ts", use: phone, dependencies: ["groups-desktop"] },
     // last: it changes the week start (and puts it back) and checks the plan layout
-    { name: "weeks-desktop", testMatch: "weekstart.spec.ts", use: desktop, dependencies: ["makeahead-phone"] },
+    { name: "weeks-desktop", testMatch: "weekstart.spec.ts", use: desktop, dependencies: ["groups-phone"] },
     { name: "weeks-phone", testMatch: "weekstart.spec.ts", use: phone, dependencies: ["weeks-desktop"] },
   ],
 });

@@ -104,7 +104,7 @@ export function registerPhotoRoutes(server: FastifyInstance, app: App) {
   };
 
   server.post<{ Params: { week: string } }>("/api/meal-plans/:week/copy", async (req) => {
-    const b = z.object({ from: SlotRef, to: z.array(SlotRef).min(1).max(40), mode: z.enum(["auto", "repeat", "leftovers", "move"]).optional() }).parse(req.body);
+    const b = z.object({ from: SlotRef, to: z.array(SlotRef).min(1).max(40), mode: z.enum(["auto", "repeat", "leftovers", "move", "join"]).optional(), keep: z.boolean().optional() }).parse(req.body);
     return app.planner.copyMeals(week(req.params.week), b);
   });
 

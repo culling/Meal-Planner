@@ -134,6 +134,10 @@ If a calorie filter leaves recipes out because they have no calorie data, the ap
 - **Add to plan** puts it on a day and meal.
 - **Cooked it** adds it to the **cook log** with an optional star rating. "Last cooked" and "not cooked lately" use this.
 - **♥** favourite, **hide**, and a **camera** button for a main photo.
+- **Goes with** lists the recipes you serve with this one: **＋ Add a suggested recipe** adds one (Cowboy Chicken with the Cowboy Chicken Salad; rice and steamed greens with Salt and Pepper Tofu), ✕ removes it. A recipe that others list shows them under **Suggested with**, so you can find the way back. When you plan the recipe, its suggestions are offered too (see [Meals of several dishes](#meals-of-several-dishes)).
+
+![Goes with](screenshots/desktop-recipe-goes-with.png)
+
 - **Leftovers** shows fridge life, freezer life and whether it freezes. It's read from the recipe's own notes where possible, marked *Estimate* if not, and editable.
 - **My notes** are your own notes ("less chilli next time"). **Notes from the original recipe** are kept separately.
 - **Photos**: add *I made this* or step photos.
@@ -177,9 +181,29 @@ The plan always opens on **today** and shows the next 7 days. On a wide screen i
 - Tap **+** in a slot and choose **Cook**, **Leftovers**, **Eat out** or **Skip**.
 - Or open **Drag a recipe onto a slot** under the plan and drag one in (desktop).
 - Or press **Add to plan** on a recipe page.
-- **+ Add another** puts more than one dish in a slot, such as meatloaf with honey-glazed carrots.
+- **+ Add a dish** puts more than one dish in a slot, such as meatloaf with honey-glazed carrots.
 
 ![A meal](screenshots/desktop-plan-meal.png)
+
+### Meals of several dishes
+
+Dishes that are served together are **one meal**: they're drawn as one card, with the extra dishes listed under the first with a **+**.
+
+![A meal of several dishes](screenshots/desktop-plan-meal-group.png)
+
+- **Drag a meal onto another meal** to serve them together (hold **Ctrl** to add a copy and leave the original where it was). Dropping a recipe from **Drag a recipe onto a slot** onto a meal does the same.
+- **Choosing a recipe** that has suggestions (see [A recipe page](#6-a-recipe-page)) shows them under it, ticked. Untick any you don't want, then **Save**. **Add to plan** on the recipe page offers them as well.
+- **+ Add a dish** adds a dish to the meal. In a dish's dialog, **Part of the meal with …** takes it out of the meal (or puts it back). Unticked, it's a separate dish that happens to be in the same slot, like several different lunches.
+
+Everything you change on one dish of a meal changes them all:
+
+- **People** and **portions to cook** are the same for every dish, so changing either on one changes the rest. When a dish joins a meal, every dish cooks as many portions as the most of them.
+- **Freezing** some of the extra freezes the same number of portions of each dish.
+- **Copying with the round handle**, **Use this meal again** and **moving** take the whole meal. Leftovers of a meal are leftovers of every dish, and each dish cooks enough for them. **Smart** mode counts the meal as keeping only as long as its quickest-to-spoil dish.
+- **Mark the meal as cooked** logs every recipe in its own cook log.
+- **Remove this dish** takes out one dish (the next one moves up if it was the first); **Remove the meal** removes them all.
+
+The round handle sits on the meal's first dish. Dragging any other dish of the meal moves just that dish, out of the meal.
 
 ### Dragging (mouse, finger or pen)
 
@@ -188,7 +212,8 @@ The plan always opens on **today** and shows the next 7 days. On a wide screen i
 | **Copy a meal along a row** (lunch for the rest of the week) | Drag the meal's **round handle** across the slots. To include a different meal row too, pause on it for a moment. |
 | **Choose slots by tapping** | Click the round handle once, tap the slots you want, then **Apply** |
 | **Duplicate** | Hold **Ctrl** and drag the meal |
-| **Move** | Drag the meal itself (on a phone, press and hold to pick it up) |
+| **Move** | Drag the meal itself to an empty slot (on a phone, press and hold to pick it up) |
+| **Serve two meals together** | Drag a meal onto another meal (see [Meals of several dishes](#meals-of-several-dishes)) |
 
 ![Fill handle](screenshots/desktop-plan-fill.png)
 

@@ -428,3 +428,18 @@ body:has(.drag-ghost) { user-select: none; -webkit-user-select: none; cursor: gr
 .slot-body.stack-body { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 4px; }
 .slot-body.stack-body .meal-btn { height: auto; }
 .slot-body.stack-body > .slot-item + .slot-item .meal-btn { border-top: 1px dashed var(--line); }
+
+/* dishes served as one meal (tofu with rice and greens): one card, the joined dishes listed under the first */
+.meal-group { display: flex; flex-direction: column; width: 100%; border-radius: 12px; box-shadow: inset 0 0 0 1.5px var(--line); }
+.slot-body.stack-body > .meal-group + .slot-item .meal-btn { border-top: 1px dashed var(--line); }
+.slot-item.joined .meal-btn { padding-top: 0; min-height: 0; }
+.slot-item.joined .meal-btn .thumb { width: 30px; height: 30px; font-size: 1rem; margin-left: 7px; }
+.slot-item.joined .meal-btn .t::before { content: "+ "; color: var(--ink-soft); }
+.slot.drop-join { background: var(--green-soft); box-shadow: inset 0 0 0 2px var(--green); }
+.slot.drop-join .meal-group, .slot.drop-join .slot-item:first-child .meal-btn { box-shadow: inset 0 0 0 2px var(--green); }
+.drag-ghost.joining { background: var(--green); color: #fff; }
+.goes-with .thumb { width: 44px; height: 44px; border-radius: 10px; background: var(--primary-soft); object-fit: cover; flex: none; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
+@media (min-width: 1100px) {
+  .slot-item.joined .meal-btn { padding-top: 2px; }
+  .slot-item.joined .meal-btn .t { font-size: 0.85rem; }
+}
