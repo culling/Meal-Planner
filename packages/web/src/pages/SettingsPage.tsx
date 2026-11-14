@@ -209,6 +209,12 @@ export function SettingsPage() {
             </div>
           </details>
         )}
+        <div className="row" style={{ flexWrap: "wrap" }}>
+          <a className="btn sm" href="/api/backup" download>
+            Download a backup
+          </a>
+          <span className="small muted">One zip with every recipe and its images, meal plans, shopping lists, saved photos, nutrition data, settings and the .env config.</span>
+        </div>
         {status && status.problems.length > 0 && (
           <div className="notice warn">
             <div>

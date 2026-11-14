@@ -10,7 +10,7 @@ export function MorePage() {
     { to: "/photos", icon: <Camera />, title: "Saved photos", text: waiting ? `${waiting} waiting to be turned into recipes` : "Photos of recipes to read now or later" },
     { to: "/new", icon: <Utensils />, title: "Write a recipe", text: "Type one in yourself" },
     { to: "/nutrition", icon: <Database />, title: "Nutrition data", text: "Every food's calories and nutrients — view and fix them" },
-    { to: "/settings", icon: <Gear />, title: "Settings", text: "People, meals, AI models, version history" },
+    { to: "/settings", icon: <Gear />, title: "Settings", text: "People, meals, AI models, version history, backup" },
   ];
   return (
     <>

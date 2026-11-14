@@ -249,3 +249,17 @@ describe("saved photos and meal copying API", () => {
     expect((await j("POST", "/api/meal-plans/2026-W46/copy", { from: { date: "2026-11-15", slot: "dinner" }, to: [] })).status).toBe(400);
   });
 });
+
+describe("backup", () => {
+  it("downloads everything as one zip", async () => {
+    await server.inject({ method: "PUT", url: "/api/settings", payload: { defaultPeople: 3 } });
+    const res = await server.inject({ method: "GET", url: "/api/backup" });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toBe("application/zip");
+    expect(String(res.headers["content-disposition"])).toMatch(/attachment; filename="meal-planner-backup-\d{4}-\d{2}-\d{2}\.zip"/);
+    const { readZip } = await import("@mp/core");
+    const names = [...readZip(res.rawPayload).keys()];
+    expect(names.some((n) => /^meal-planner-backup-[\d-]+\/README\.txt$/.test(n))).toBe(true);
+    expect(names.some((n) => n.endsWith("/data/settings.md"))).toBe(true);
+  });
+});

@@ -10,10 +10,12 @@ import {
   ShoppingItemSchema,
   ValidationError,
   applyBreakdown,
+  buildBackup,
   estimateFood,
   isValidWeek,
   isValidYmd,
   isoWeekOf,
+  repoRoot,
   slugify,
   todayYmd,
   type App,
@@ -225,6 +227,16 @@ export function registerOtherRoutes(server: FastifyInstance, app: App) {
       git: { enabled: store.git.ready, history },
       today: todayYmd(),
     };
+  });
+
+  /** Download everything — recipes, images, plans, shopping lists, photos, nutrition data, settings and .env — as one zip. */
+  server.get("/api/backup", async (_req, reply) => {
+    const { zip, fileName } = await buildBackup(store.dataDir, { envFile: path.join(repoRoot(), ".env") });
+    void reply
+      .header("content-type", "application/zip")
+      .header("content-disposition", `attachment; filename="${fileName}"`)
+      .header("cache-control", "no-store");
+    return reply.send(zip);
   });
 
   /** Server-sent events: tells open pages when a file changes (in the app or in a text editor). */

@@ -17,3 +17,4 @@ export * from "./ingredients";
 export { draftFromHtml, findJsonLdRecipe, cleanPageText } from "./jsonld";
 export * from "./photos";
 export * from "./copymeals";
+export * from "./backup";
